@@ -81,3 +81,29 @@ TEST(trace_through_portals_and_steps) {
     float t = traceSegment(*m, 0, {1, 2}, 1.6f, {21, 2}, 1.6f);       // wall at x=8 (step)
     CHECK(t > 0.34f && t < 0.36f);
 }
+
+TEST(pumping_station_loads_with_movers) {
+    MapError err;
+    auto m = loadMap(std::string(TEXTGME_ASSET_DIR) + "/maps/pumping-station.map", err);
+    if (!m) std::fprintf(stderr, "  line %d: %s\n", err.line, err.message.c_str());
+    CHECK(m.has_value());
+    if (!m) return;
+    int doors = 0, lifts = 0, locked = 0;
+    for (auto& s : m->sectors) {
+        doors += s.mover == Mover::Door;
+        lifts += s.mover == Mover::Lift;
+        locked += s.key != KeyColor::None;
+    }
+    CHECK(doors == 3 && lifts == 1 && locked == 2);
+    // All sectors joined by portals.
+    std::vector<bool> seen(m->sectors.size(), false);
+    std::vector<int> stack{m->sectorAt(m->playerStart()->pos)};
+    while (!stack.empty()) {
+        int s = stack.back();
+        stack.pop_back();
+        if (s < 0 || seen[static_cast<size_t>(s)]) continue;
+        seen[static_cast<size_t>(s)] = true;
+        for (int n : m->sectors[static_cast<size_t>(s)].neighbor) stack.push_back(n);
+    }
+    for (bool b : seen) CHECK(b);
+}

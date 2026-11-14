@@ -1,0 +1,46 @@
+# Pumping Station - the second level: doors, a lift and two keycards.
+name Pumping Station
+
+# Entry hall, and the door east into the pump room
+sector floor=0 ceil=4 light=0.75 wall=metal floortex=tile ceiltex=panel : 0,0 10,0 10,3 10,5 10,8 0,8
+sector floor=0 ceil=3 light=0.7  wall=tech  floortex=tech ceiltex=tech door : 10,3 10.5,3 10.5,5 10,5
+
+# Pump room (two convex pieces) and the lift up to the platform
+sector floor=0 ceil=6 light=0.55 wall=stone floortex=dirt ceiltex=metal : 10.5,-4 14,-4 16,-4 20,-4 20,10 17,10 10.5,10 10.5,5 10.5,3
+sector floor=0 ceil=6 light=0.55 wall=stone floortex=dirt ceiltex=metal : 10.5,10 17,10 17,12 10.5,12
+sector floor=3 ceil=7 light=0.8  wall=tech  floortex=tech ceiltex=metal lift low=0 : 17,10 20,10 20,12 17,12
+
+# Platform with the red key, and the red door west
+sector floor=3 ceil=7 light=0.7 wall=stone floortex=metal ceiltex=metal : 10.5,12 17,12 20,12 20,18 10.5,18 10.5,16 10.5,14
+sector floor=3 ceil=5.5 light=0.8 wall=brick floortex=tech ceiltex=tech door key=red : 10,14 10.5,14 10.5,16 10,16
+
+# Control room with the blue key
+sector floor=3 ceil=5 light=0.45 wall=tech floortex=tile ceiltex=panel : 2,12 10,12 10,14 10,16 10,20 2,20
+
+# Blue door south, exit corridor, exit pad
+sector floor=0 ceil=3 light=0.7 wall=metal floortex=tech ceiltex=tech door key=blue : 14,-4.5 16,-4.5 16,-4 14,-4
+sector floor=0 ceil=3 light=0.5 wall=brick floortex=wood ceiltex=panel : 13,-10 14,-10 16,-10 17,-10 17,-4.5 16,-4.5 14,-4.5 13,-4.5
+sector floor=0.2 ceil=3 light=1.0 wall=tech floortex=tech ceiltex=tech exit : 14,-12 16,-12 16,-10 14,-10
+
+thing player 2,4 0
+thing ammo   5,7
+thing medkit 5,1
+
+thing grunt  15,0 180
+thing grunt  18,6 180
+thing grunt  13,8 270
+thing brute  18,-2 90
+
+thing grunt  13,16 270
+thing grunt  18,15 270
+thing redkey 15,16
+thing armor  19,17
+
+thing grunt  4,14 0
+thing grunt  6,18 0
+thing bluekey 3,19
+thing medkit 8,19
+thing ammo   3,13
+
+thing grunt  15,-7 90
+thing medkit 13.5,-9

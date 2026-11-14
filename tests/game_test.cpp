@@ -160,3 +160,87 @@ TEST(lift_lowers_waits_and_rises) {
     tick(l, Controls{}, 4.5f);
     CHECK(l.map().sectors[3].floor >= 1.99f);
 }
+
+
+namespace {
+struct Step {
+    float x, y;
+    bool use = false;     // on arrival, face `face` and press use
+    float face = 0;       // degrees
+    float wait = 0;       // seconds to stand still afterwards
+};
+
+// Drives the player through waypoints like a very patient speedrunner.
+bool follow(Game& g, const std::vector<Step>& route, std::string& where) {
+    const float dt = 1.0f / 60;
+    for (size_t i = 0; i < route.size(); ++i) {
+        const Step& s = route[i];
+        float t = 0;
+        for (;; t += dt) {
+            if (t > 20) {
+                char buf[128];
+                std::snprintf(buf, sizeof buf, "stuck before step %zu at %.2f,%.2f z=%.2f", i, g.player().pos.x,
+                              g.player().pos.y, g.player().z);
+                where = buf;
+                return false;
+            }
+            Vec2 to = Vec2{s.x, s.y} - g.player().pos;
+            if (length(to) < 0.25f) break;
+            float want = std::atan2(to.y, to.x);
+            float diff = std::remainder(want - g.player().angle, 2 * 3.14159265f);
+            Controls c;
+            c.look = std::clamp(diff, -0.1f, 0.1f);
+            c.forward = std::abs(diff) < 0.3f ? std::min(1.0f, length(to)) : 0;
+            g.update(c, dt);
+            if (g.state() != State::Playing) return g.state() == State::Won;
+        }
+        if (s.use) {
+            float want = s.face * 3.14159265f / 180;
+            for (int k = 0; k < 120; ++k) {
+                Controls c;
+                c.look = std::clamp(std::remainder(want - g.player().angle, 2 * 3.14159265f), -0.1f, 0.1f);
+                g.update(c, dt);
+            }
+            Controls use;
+            use.use = true;
+            g.update(use, dt);
+        }
+        for (float w = 0; w < s.wait; w += dt) g.update(Controls{}, dt);
+        if (g.state() == State::Won) return true;
+    }
+    where = "route ended without reaching the exit";
+    return g.state() == State::Won;
+}
+}  // namespace
+
+TEST(pumping_station_is_beatable) {
+    MapError err;
+    auto m = loadMap(std::string(TEXTGME_ASSET_DIR) + "/maps/pumping-station.map", err);
+    CHECK(m.has_value());
+    if (!m) return;
+    std::erase_if(m->things, [](const Thing& t) { return t.type == ThingType::Grunt || t.type == ThingType::Brute; });
+    Game g(*m);
+    std::vector<Step> route = {
+        {9.2f, 4, true, 0, 1.5f},      // open the hall door
+        {12, 4},
+        {18.5f, 9.2f, true, 90, 1.6f}, // call the lift down
+        {18.5f, 11},                   // step on, wait for it to rise
+        {18.5f, 11, false, 0, 5.0f},
+        {18.5f, 13},
+        {15, 16},                      // red key
+        {11.2f, 15, true, 180, 1.5f},  // red door
+        {8, 15},
+        {3, 19},                       // blue key
+        {9.2f, 15, true, 0, 1.5f},     // back out through the red door
+        {12, 15},
+        {13, 11},                      // drop off the platform
+        {15, -3.2f, true, 270, 1.5f},  // blue door
+        {15, -7},
+        {15, -11},                     // exit pad
+    };
+    std::string where;
+    bool won = follow(g, route, where);
+    if (!won) std::fprintf(stderr, "  %s\n", where.c_str());
+    CHECK(won);
+    CHECK(g.hasKey(KeyColor::Red) && g.hasKey(KeyColor::Blue));
+}
