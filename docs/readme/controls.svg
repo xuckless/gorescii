@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="156" viewBox="0 0 480 156" role="img" aria-label="Controls: W A S D move, the mouse turns and fires, Space fires, E opens doors and lifts, 1 and 2 switch weapons.">
+<title>Controls: W A S D move, the mouse turns and fires, Space fires, E opens doors and lifts, 1 and 2 switch weapons.</title>
+<style>
+text { font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, 'DejaVu Sans Mono', 'Liberation Mono', monospace; font-size: 13px; }
+.sans { font-family: -apple-system, 'Segoe UI', Inter, Roboto, 'Helvetica Neue', Arial, sans-serif; font-size: 12px; }
+* { transform-box: fill-box; }
+.cap rect { fill: #2a2f45; } .cap text { fill: #a9b1d6; }
+.cap { animation: press 10s infinite; }
+.cap rect { animation: capbg 10s infinite; } .cap text { animation: capfg 10s infinite; }
+.said { opacity: 0; animation: say 10s infinite; }
+.k0, .k0 rect, .k0 text { animation-delay: 0s; }
+.k1, .k1 rect, .k1 text { animation-delay: 2s; }
+.k2, .k2 rect, .k2 text { animation-delay: 4s; }
+.k3, .k3 rect, .k3 text { animation-delay: 6s; }
+.k4, .k4 rect, .k4 text { animation-delay: 8s; }
+@keyframes press { 0% { transform: none; } 2%, 12% { transform: translateY(2px); } 16%, 100% { transform: none; } }
+@keyframes capbg { 0% { fill: #2a2f45; } 2%, 14% { fill: #ff9e64; } 20%, 100% { fill: #2a2f45; } }
+@keyframes capfg { 0% { fill: #a9b1d6; } 2%, 14% { fill: #16161e; } 20%, 100% { fill: #a9b1d6; } }
+@keyframes say { 0% { opacity: 0; } 3%, 17% { opacity: 1; } 21%, 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; } .said { opacity: 1; } }
+</style>
+<rect x="0.5" y="0.5" width="479" height="155" rx="10" fill="#1f2335" stroke="#2f3449"/>
+<path d="M10 0.5h460a9.5 9.5 0 0 1 9.5 9.5v20.5h-479v-20.5a9.5 9.5 0 0 1 9.5-9.5z" fill="#1a1b26"/><text x="16.0" y="20" fill="#8089b3" font-size="12">controls</text>
+<g class="cap k0"><rect x="52.0" y="54" width="26" height="26" rx="5"/><text x="65.0" y="71.5" text-anchor="middle">W</text></g>
+<g class="cap k0"><rect x="22.0" y="84" width="26" height="26" rx="5"/><text x="35.0" y="101.5" text-anchor="middle">A</text></g>
+<g class="cap k0"><rect x="52.0" y="84" width="26" height="26" rx="5"/><text x="65.0" y="101.5" text-anchor="middle">S</text></g>
+<g class="cap k0"><rect x="82.0" y="84" width="26" height="26" rx="5"/><text x="95.0" y="101.5" text-anchor="middle">D</text></g>
+<text class="said k0 sans" x="65" y="136" text-anchor="middle" fill="#ff9e64">Move</text>
+<g class="cap k1"><rect x="152" y="54" width="34" height="56" rx="17"/><path class="wheel" d="M169 62v12" stroke="#16161e" stroke-width="3" stroke-linecap="round"/></g>
+<text class="said k1 sans" x="169" y="136" text-anchor="middle" fill="#ff9e64">Turn and fire</text>
+<g class="cap k2"><rect x="232.0" y="84" width="96" height="26" rx="5"/><text x="280.0" y="101.5" text-anchor="middle">Space</text></g>
+<text class="said k2 sans" x="280" y="136" text-anchor="middle" fill="#ff9e64">Fire</text>
+<g class="cap k3"><rect x="352.0" y="84" width="26" height="26" rx="5"/><text x="365.0" y="101.5" text-anchor="middle">E</text></g>
+<text class="said k3 sans" x="365" y="136" text-anchor="middle" fill="#ff9e64">Open</text>
+<g class="cap k4"><rect x="400.0" y="84" width="26" height="26" rx="5"/><text x="413.0" y="101.5" text-anchor="middle">1</text></g>
+<g class="cap k4"><rect x="430.0" y="84" width="26" height="26" rx="5"/><text x="443.0" y="101.5" text-anchor="middle">2</text></g>
+<text class="said k4 sans" x="443" y="136" text-anchor="middle" fill="#ff9e64">Weapon</text>
+</svg>

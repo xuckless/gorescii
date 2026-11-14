@@ -1,75 +1,85 @@
-# Gorescii
+<div align="center">
 
-A 2.5D first-person shooter that runs in your terminal. The world is drawn
-by a software sector renderer, then turned into coloured ASCII by a CPU
-take on the ASCII shader from
-[AcerolaFX](https://github.com/GarrettGunnell/AcerolaFX).
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/logo-dark.svg"/>
+  <img src="docs/readme/logo-light.svg" alt="Gorescii" width="300"/>
+</picture>
 
-## Build and run
+**An old-school first-person shooter, drawn in ASCII in your terminal**
 
-Needs a C++20 compiler and CMake 3.20+ (macOS or Linux). No other dependencies.
+<a href="https://github.com/xuckless/gorescii/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/xuckless/gorescii/ci.yml?branch=main&style=flat-square&label=CI"/></a> <a href="#license"><img alt="License: MIT OR Apache-2.0" src="https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-ff9e64?style=flat-square"/></a>
+
+[Build](#build) · [Controls](#controls) · [Make a level](assets/maps/README.md) · [How it works](#how-it-works)
+
+</div>
+
+## Build
 
 ```sh
-cmake -S . -B build
-cmake --build build -j
+cmake -S . -B build && cmake --build build -j
 ./build/gorescii
-ctest --test-dir build      # unit tests
 ```
 
-Sound effects are synthesised at startup and played through `afplay`
-(macOS) or `paplay`/`aplay` (Linux) when one is installed.
+Needs a C++20 compiler and CMake 3.20 or newer, on macOS or Linux. No libraries. Use a truecolor terminal; Ghostty, kitty, WezTerm, foot and recent iTerm2 also report key releases, which makes movement feel right.
 
-Use a truecolor terminal. Ghostty, kitty, WezTerm, foot and recent iTerm2
-also report key releases (kitty keyboard protocol), which makes movement
-feel right; elsewhere the game falls back to key repeat. Bigger windows and
-smaller fonts mean more detail.
+## Every frame is real ASCII
 
-| Flag | |
-|---|---|
-| `--map FILE` | play one map instead of the campaign (`assets/maps/campaign.txt`; format in `assets/maps/README.md`) |
-| `--cell-width N` | pixels rendered per cell column (default 4; lower is faster) |
-| `--mouse-sens X` / `--no-mouse` | mouse look sensitivity, or turn it off |
-| `--no-sound` | no sound effects |
-| `--style clean\|lines\|off` | edge look: geometry only (default), texture detail in line glyphs too, or none |
-| `--snapshot 120x40 [--at X,Y,DEG]` | print one frame as plain text and exit |
+The world is rendered in 3D, then every terminal cell becomes one coloured character. These are frames from the game, not a video.
+
+<img src="docs/readme/play.svg" alt="Gorescii running in a terminal: walking down a corridor and shooting a grunt, all drawn in coloured ASCII" width="600"/>
+
+## From pixels to glyphs
+
+Each cell covers a 4×8 tile of pixels. Brightness picks a fill from ` .:coPO?@#`, and where edges agree a line glyph `| _ / \` wins. The approach comes from [Acerola's ASCII shader](https://github.com/GarrettGunnell/AcerolaFX).
+
+<img src="docs/readme/shader.svg" alt="One frame three ways: rendered pixels, cells where edges win, and the final coloured ASCII" width="520"/>
 
 ## Controls
 
-| | |
-|---|---|
-| W A S D | move / strafe (always run; hold Shift to walk) |
-| ← → or J L, mouse | turn; park the pointer at a window edge to keep turning |
-| Space, Ctrl, left click | fire |
-| E | open doors, call lifts |
-| 1 2, Q, Tab, wheel, right click | switch weapon |
-| Esc | pause (X quits from the pause screen) |
-| C / V / B | colour mode / edge style (clean, lines, off) / background fill |
-| M | mute / unmute |
-| Enter | restart after dying or finishing |
-| Ctrl-C | quit |
+Keyboard, mouse or both. A terminal can't capture the pointer, so resting it at the window edge keeps you turning.
+
+<img src="docs/readme/controls.svg" alt="Controls: W A S D move, the mouse turns and fires, Space fires, E opens doors and lifts, 1 and 2 switch weapons" width="480"/>
+
+<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move · <kbd>←</kbd><kbd>→</kbd> turn · <kbd>Space</kbd> fire · <kbd>E</kbd> use · <kbd>1</kbd> <kbd>2</kbd> weapons · <kbd>Esc</kbd> pause · <kbd>C</kbd> colour · <kbd>V</kbd> edges · <kbd>M</kbd> mute
+
+## Doors, lifts and keycards
+
+Two original levels, joined into a campaign. Health, armour and ammo carry over. Levels are plain text files of convex sectors, so you can write your own.
+
+<img src="docs/readme/map.svg" alt="Top-down plan of the Pumping Station level with doors, a lift, two keycards and the route to the exit" width="464"/>
+
+```
+sector floor=3 ceil=7 lift low=0 : 17,10 20,10 20,12 17,12
+sector floor=3 ceil=5.5 door key=red : 10,14 10.5,14 10.5,16 10,16
+thing redkey 15,16
+```
+
+The format is in [assets/maps/README.md](assets/maps/README.md). Play one map with `gorescii --map my.map`.
 
 ## How it works
 
 ```
-map (convex sectors) -> portal renderer -> colour + depth + surface-id framebuffer
-                     -> sprites, weapon, flashes
-                     -> ASCII pass -> cell grid -> HUD -> diffed ANSI output
+sectors -> portal renderer -> colour, depth, surface ids -> sprites, weapon, flashes
+        -> ASCII pass -> cells -> HUD -> only the changed cells, as truecolor escapes
 ```
 
-- **Renderer** (`src/render`): starts in the camera's sector and recurses
-  through portals, keeping per-column clip bounds. It draws textured walls,
-  upper and lower steps, per-pixel floors and ceilings, a sky panorama and
-  depth-tested billboard sprites. Textures and sprite art are generated in code.
-- **ASCII pass** (`src/gfx/ascii.cpp`): each terminal cell covers a 4×8 pixel
-  tile.
-  - Tile luminance picks a fill glyph from ` .:coPO?@#`.
-  - Difference-of-Gaussians plus Sobel finds edges and buckets their angle
-    into `| _ / \`. Jumps in depth and in surface id (the stand-in for
-    AcerolaFX's normals) add edges too.
-  - Each cell votes, and if enough pixels agree the line glyph wins over the fill.
-  - Cell colour comes from the image, normalised so dark areas aren't darkened twice.
-- **Presenter** (`src/gfx/present.cpp`): sends only the cells that changed, as
-  truecolor escapes wrapped in synchronized updates.
-- **Game** (`src/game`): circle-vs-segment collision with steps and gravity,
-  line-of-sight traces through portals, grunts with hitscan, brutes with
-  fireballs, pickups, slime and the exit.
+- `src/render` walks from the camera's sector through portals and draws mipmapped walls, floors, sky and depth-tested sprites. Textures and sprite art are generated in code.
+- `src/gfx` is the ASCII pass, Difference-of-Gaussians and Sobel edges, with depth and surface-id jumps standing in for normals, and the diffing presenter.
+- `src/game` has the collision, enemies, weapons, doors, lifts and pickups. `src/audio` synthesises the sound effects and plays them through `afplay`, `paplay` or `aplay`.
+- `src/term` handles raw mode, the kitty keyboard protocol and SGR mouse reporting.
+
+Run `gorescii --help` for flags: `--style clean|lines|off`, `--mouse-sens`, `--no-mouse`, `--no-sound`, `--cell-width`, and `--snapshot 120x40` to print one frame as text.
+
+## Develop
+
+```sh
+ctest --test-dir build --output-on-failure
+cmake -S . -B build-asan -DCMAKE_BUILD_TYPE=Debug -DGORESCII_SANITIZE=ON
+./build/gorescii_readme_art docs/readme      # redraw the animations above
+```
+
+The tests include a bot that plays through Pumping Station to prove it can be finished. The animations in this README are drawn by the engine itself.
+
+## License
+
+[MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your option.
