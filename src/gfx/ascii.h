@@ -40,6 +40,13 @@ struct AsciiSettings {
     float backgroundBlend = 0.0f;
 };
 
+// Edge presets. Lines: texture detail (panel seams, tiles, mortar) is drawn
+// in line glyphs too, the busier AcerolaFX look. Clean: only geometry gets
+// lines and texture stays as fill. Off: fill glyphs only.
+enum class EdgeStyle { Lines, Clean, Off };
+void applyEdgeStyle(AsciiSettings& s, EdgeStyle style);
+const char* edgeStyleName(EdgeStyle style);
+
 class AsciiShader {
 public:
     AsciiSettings settings;

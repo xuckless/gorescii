@@ -136,7 +136,7 @@ void drawHud(gfx::CellGrid& s, const game::Game& g, const HudInfo& info) {
         dialog(s, sceneRows, "OUTPOST CLEARED", kGreen, {num, "", "Enter  play again", "Ctrl-C  quit"});
     } else if (info.paused) {
         dialog(s, sceneRows, "PAUSED", kText,
-               {"Esc  resume        X  quit", "", "C  colour mode   V  edges   B  background"});
+               {"Esc  resume        X  quit", "", "C  colour mode   V  edge style   B  background"});
     }
 }
 

@@ -82,3 +82,13 @@ TEST(texture_mips_average_and_select) {
     CHECK(mipLevel(2.5f) == 1);
     CHECK(mipLevel(100.0f) == Texture::kLevels - 1);
 }
+
+TEST(edge_style_presets) {
+    AsciiSettings s;
+    applyEdgeStyle(s, EdgeStyle::Lines);
+    float lines = s.dogThreshold;
+    applyEdgeStyle(s, EdgeStyle::Clean);
+    CHECK(s.edges && s.dogThreshold > lines);
+    applyEdgeStyle(s, EdgeStyle::Off);
+    CHECK(!s.edges);
+}

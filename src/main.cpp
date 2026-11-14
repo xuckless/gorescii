@@ -25,6 +25,7 @@ struct Options {
     std::string mapPath = std::string(TEXTGME_ASSET_DIR) + "/maps/outpost.map";
     int cellW = 4;
     bool mouse = true;
+    gfx::EdgeStyle style = gfx::EdgeStyle::Lines;
     float mouseSens = 1.0f;
     bool snapshot = false;
     int snapCols = 120, snapRows = 40;
@@ -35,6 +36,7 @@ struct Options {
 void usage() {
     std::puts(
         "usage: textgme [--map FILE] [--cell-width N] [--mouse-sens X] [--no-mouse]\n"
+        "               [--style lines|clean|off]\n"
         "               [--snapshot COLSxROWS] [--at X,Y,DEG]\n"
         "  --snapshot  render one frame as plain text to stdout and exit");
 }
@@ -51,6 +53,14 @@ bool parseArgs(int argc, char** argv, Options& o) {
             const char* v = next();
             if (!v) return false;
             o.cellW = std::clamp(std::atoi(v), 1, 8);
+        } else if (a == "--style") {
+            const char* v = next();
+            if (!v) return false;
+            std::string sv = v;
+            if (sv == "lines") o.style = gfx::EdgeStyle::Lines;
+            else if (sv == "clean") o.style = gfx::EdgeStyle::Clean;
+            else if (sv == "off") o.style = gfx::EdgeStyle::Off;
+            else return false;
         } else if (a == "--no-mouse") {
             o.mouse = false;
         } else if (a == "--mouse-sens") {
@@ -118,9 +128,17 @@ struct View {
         st.tint = {255, 255, 255};
         return "Colour: full";
     }
-    std::string toggleEdges() {
-        shader.settings.edges = !shader.settings.edges;
-        return shader.settings.edges ? "Edges on" : "Edges off";
+    gfx::EdgeStyle style = gfx::EdgeStyle::Lines;
+    void setStyle(gfx::EdgeStyle st) {
+        style = st;
+        gfx::applyEdgeStyle(shader.settings, st);
+    }
+    // V cycles lines -> clean -> off.
+    std::string cycleEdges() {
+        setStyle(style == gfx::EdgeStyle::Lines   ? gfx::EdgeStyle::Clean
+                 : style == gfx::EdgeStyle::Clean ? gfx::EdgeStyle::Off
+                                                  : gfx::EdgeStyle::Lines);
+        return std::string("Edges: ") + gfx::edgeStyleName(style);
     }
     std::string toggleBackground() {
         auto& b = shader.settings.backgroundBlend;
@@ -178,6 +196,7 @@ int runSnapshot(const Map& map, const Options& o) {
         g = game::Game(moved);
     }
     View view;
+    view.setStyle(o.style);
     view.draw(g, o.snapCols, o.snapRows, o.cellW, 2.0, ui::HudInfo{});
     for (int y = 0; y < view.grid.rows; ++y) {
         std::string line;
@@ -198,6 +217,7 @@ int runInteractive(const Map& map, const Options& o) {
     std::vector<term::MouseEvent> mouseEvents;
     gfx::Presenter presenter;
     View view;
+    view.setStyle(o.style);
     game::Game g(map);
     std::string inbuf;
     bool paused = false;
@@ -232,7 +252,7 @@ int runInteractive(const Map& map, const Options& o) {
             }
             if (e.action == term::KeyAction::Press && !e.ctrl) {
                 if (e.key == term::keyChar('c')) toast(view.cycleColor(), now);
-                if (e.key == term::keyChar('v')) toast(view.toggleEdges(), now);
+                if (e.key == term::keyChar('v')) toast(view.cycleEdges(), now);
                 if (e.key == term::keyChar('b')) toast(view.toggleBackground(), now);
             }
             if (e.key == term::Key::FocusOut) {

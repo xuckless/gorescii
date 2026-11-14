@@ -52,6 +52,20 @@ void blur(const std::vector<float>& src, std::vector<float>& dst, std::vector<fl
 
 }  // namespace
 
+void applyEdgeStyle(AsciiSettings& s, EdgeStyle style) {
+    s.edges = style != EdgeStyle::Off;
+    s.dogThreshold = style == EdgeStyle::Lines ? 0.012f : 0.05f;
+}
+
+const char* edgeStyleName(EdgeStyle style) {
+    switch (style) {
+        case EdgeStyle::Lines: return "lines";
+        case EdgeStyle::Clean: return "clean";
+        case EdgeStyle::Off: return "off";
+    }
+    return "?";
+}
+
 int AsciiShader::directionBucket(float gx, float gy) {
     if (gx == 0 && gy == 0) return -1;
     float theta = std::atan2(gy, gx);

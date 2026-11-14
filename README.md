@@ -26,6 +26,7 @@ smaller fonts mean more detail.
 | `--map FILE` | play another map (see `assets/maps/README.md`) |
 | `--cell-width N` | pixels rendered per cell column (default 4; lower is faster) |
 | `--mouse-sens X` / `--no-mouse` | mouse look sensitivity, or turn it off |
+| `--style lines\|clean\|off` | edge look: texture detail in line glyphs (default), geometry only, or none |
 | `--snapshot 120x40 [--at X,Y,DEG]` | print one frame as plain text and exit |
 
 ## Controls
@@ -37,7 +38,7 @@ smaller fonts mean more detail.
 | Space, Ctrl, left click | fire |
 | 1 2, Q, Tab, wheel, right click | switch weapon |
 | Esc | pause (X quits from the pause screen) |
-| C / V / B | colour mode / edge glyphs / background fill |
+| C / V / B | colour mode / edge style (lines, clean, off) / background fill |
 | Enter | restart after dying or finishing |
 | Ctrl-C | quit |
 
