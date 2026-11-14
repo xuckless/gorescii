@@ -63,6 +63,8 @@ std::optional<ThingType> thingFromName(const std::string& n) {
     if (n == "medkit") return ThingType::Medkit;
     if (n == "ammo") return ThingType::Ammo;
     if (n == "armor") return ThingType::Armor;
+    if (n == "redkey") return ThingType::RedKey;
+    if (n == "bluekey") return ThingType::BlueKey;
     return std::nullopt;
 }
 
@@ -121,7 +123,7 @@ std::optional<Map> parseMap(const std::string& text, MapError& err) {
         } else if (kind == "sector") {
             Sector s;
             std::string tok;
-            bool corners = false;
+            bool corners = false, hasLow = false;
             while (ls >> tok) {
                 if (tok == ":") {
                     corners = true;
@@ -137,13 +139,23 @@ std::optional<Map> parseMap(const std::string& text, MapError& err) {
                     s.exit = true;
                     continue;
                 }
+                if (tok == "door" || tok == "lift") {
+                    s.mover = tok == "door" ? Mover::Door : Mover::Lift;
+                    continue;
+                }
                 auto eq = tok.find('=');
                 if (eq == std::string::npos) return fail(lineNo, "expected key=value, got '" + tok + "'");
                 std::string key = tok.substr(0, eq), val = tok.substr(eq + 1);
                 float f = 0;
-                if (key == "floor" || key == "ceil" || key == "light" || key == "damage") {
+                if (key == "floor" || key == "ceil" || key == "light" || key == "damage" || key == "low") {
                     if (!parseFloat(val, f)) return fail(lineNo, "bad number for " + key);
-                    (key == "floor" ? s.floor : key == "ceil" ? s.ceil : key == "light" ? s.light : s.damage) = f;
+                    (key == "floor" ? s.floor : key == "ceil" ? s.ceil : key == "light" ? s.light
+                                    : key == "damage"           ? s.damage : s.lowFloor) = f;
+                    if (key == "low") hasLow = true;
+                } else if (key == "key") {
+                    if (val == "red") s.key = KeyColor::Red;
+                    else if (val == "blue") s.key = KeyColor::Blue;
+                    else return fail(lineNo, "unknown key colour '" + val + "' (red or blue)");
                 } else if (key == "wall" || key == "floortex" || key == "ceiltex") {
                     auto t = texFromName(val);
                     if (!t) return fail(lineNo, "unknown texture '" + val + "'");
@@ -154,6 +166,17 @@ std::optional<Map> parseMap(const std::string& text, MapError& err) {
             }
             if (s.verts.size() < 3) return fail(lineNo, "sector needs at least 3 corners after ':'");
             if (s.ceil <= s.floor) return fail(lineNo, "ceil must be above floor");
+            if (s.key != KeyColor::None && s.mover != Mover::Door) return fail(lineNo, "key= only applies to doors");
+            if (s.mover == Mover::Door) {
+                s.openCeil = s.ceil;
+                s.ceil = s.floor;  // doors start shut
+            }
+            if (s.mover == Mover::Lift) {
+                if (!hasLow || s.lowFloor >= s.floor) return fail(lineNo, "a lift needs low=<height> below its floor");
+                s.topFloor = s.floor;
+            } else if (hasLow) {
+                return fail(lineNo, "low= only applies to lifts");
+            }
             float area = signedArea(s.verts);
             if (std::abs(area) < kEps) return fail(lineNo, "sector has no area");
             if (area < 0) std::reverse(s.verts.begin(), s.verts.end());

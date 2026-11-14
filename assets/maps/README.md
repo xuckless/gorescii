@@ -25,9 +25,18 @@ sectors and edges that overlap a neighbour without matching corners.
 | `ceiltex`  | panel   | ceiling texture; `sky` opens it to sky   |
 | `damage`   | 0       | health lost per second on the floor      |
 | `exit`     |         | flag: standing here finishes the level   |
+| `door`     |         | flag: starts shut, opens to `ceil` on use|
+| `key`      |         | `red` or `blue`: door needs that key     |
+| `lift`     |         | flag: lowers to `low` on use, then rises |
+| `low`      |         | lift's bottom height                     |
 
 Textures: `brick metal stone tech wood tile panel dirt slime sky`.
 
 The player can step up 0.6 and needs 1.9 of headroom.
 
-**Things**: `player` (exactly one), `grunt`, `brute`, `medkit`, `ammo`, `armor`.
+Doors and lifts are used with E, facing them from up to 1.6 away (or
+standing on a lift). Give a door its own `wall` texture: its face is drawn
+with it.
+
+**Things**: `player` (exactly one), `grunt`, `brute`, `medkit`, `ammo`,
+`armor`, `redkey`, `bluekey`.
