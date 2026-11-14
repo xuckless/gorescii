@@ -19,6 +19,8 @@ add_library(textgme_core STATIC
   src/gfx/ascii.cpp
   src/gfx/present.cpp
   src/world/map.cpp
+  src/render/textures.cpp
+  src/render/renderer.cpp
 )
 target_include_directories(textgme_core PUBLIC src)
 target_compile_options(textgme_core PUBLIC -Wall -Wextra -Wpedantic -Wshadow)
