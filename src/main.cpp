@@ -71,11 +71,19 @@ struct View {
     gfx::AsciiShader shader;
     render::Renderer renderer;
 
-    void draw(const Map& map, const render::Camera& cam, int cols, int rows, int cellW, double cellAspect) {
+    std::vector<render::SpriteInstance> sprites;
+
+    void draw(const game::Game& g, int cols, int rows, int cellW, double cellAspect) {
         int cellH = std::max(1, static_cast<int>(std::lround(cellW * cellAspect)));
         if (grid.cols != cols || grid.rows != rows) grid.resize(cols, rows);
         if (fb.width != cols * cellW || fb.height != rows * cellH) fb.resize(cols * cellW, rows * cellH);
-        renderer.render(map, cam, fb);
+        renderer.render(g.map(), g.camera(), fb);
+        g.collectSprites(sprites);
+        renderer.drawSprites(sprites, fb);
+        game::WeaponView wv = g.weaponView();
+        float px = fb.height / 48.0f;
+        renderer.drawOverlay(render::sprite(wv.sprite), fb.width * (0.5f + wv.bobX), fb.height * (1.0f + wv.bobY) + px,
+                             px, wv.flash ? 1.3f : 0.9f, fb);
         shader.apply(fb, cellW, cellH, grid);
     }
 };
@@ -90,24 +98,29 @@ game::Controls readControls(const term::KeyState& k) {
     c.run = !k.held(Key::Shift);  // always run; hold Shift to walk (needs key-release support)
     c.fire = k.held(Key::Space) || k.held(Key::Ctrl);
     c.use = k.pressed(keyChar('e'));
+    if (k.pressed(keyChar('1'))) c.weaponSlot = 1;
+    if (k.pressed(keyChar('2'))) c.weaponSlot = 2;
+    c.nextWeapon = k.pressed(keyChar('q')) || k.pressed(Key::Tab);
     return c;
 }
 
 int runSnapshot(const Map& map, const Options& o) {
     game::Game g(map);
-    render::Camera cam = g.camera();
     if (o.snapAt) {
-        cam.pos = {o.atX, o.atY};
-        cam.angle = o.atAngle * 3.14159265f / 180.0f;
-        cam.sector = map.sectorAt(cam.pos);
-        if (cam.sector < 0) {
+        Map moved = map;
+        for (Thing& t : moved.things) {
+            if (t.type != ThingType::Player) continue;
+            t.pos = {o.atX, o.atY};
+            t.angle = o.atAngle * 3.14159265f / 180.0f;
+        }
+        if (moved.sectorAt({o.atX, o.atY}) < 0) {
             std::fprintf(stderr, "--at position is outside the map\n");
             return 1;
         }
-        cam.z = map.sectors[static_cast<size_t>(cam.sector)].floor + 1.6f;
+        g = game::Game(moved);
     }
     View view;
-    view.draw(map, cam, o.snapCols, o.snapRows, o.cellW, 2.0);
+    view.draw(g, o.snapCols, o.snapRows, o.cellW, 2.0);
     for (int y = 0; y < view.grid.rows; ++y) {
         std::string line;
         for (int x = 0; x < view.grid.cols; ++x) gfx::appendUtf8(line, view.grid.at(x, y).glyph);
@@ -141,17 +154,17 @@ int runInteractive(const Map& map, const Options& o) {
         tty.readAvailable(inbuf);
         bool quit = false;
         for (const auto& e : term::decode(inbuf)) {
-            if (e.key == term::Key::Escape || e.key == term::keyChar('q') || (e.ctrl && e.key == term::keyChar('c')))
-                quit = true;
+            if (e.key == term::Key::Escape || (e.ctrl && e.key == term::keyChar('c'))) quit = true;
             keys.apply(e, now);
         }
         if (quit) break;
 
+        if (g.state() != game::State::Playing && keys.pressed(term::Key::Enter)) g = game::Game(map, static_cast<uint32_t>(now * 1000));
         g.update(readControls(keys), static_cast<float>(dt));
 
         if (tty.consumeResize()) presenter.invalidate();
         term::Size sz = tty.size();
-        view.draw(g.map(), g.camera(), sz.cols, sz.rows, o.cellW, sz.cellAspect());
+        view.draw(g, sz.cols, sz.rows, o.cellW, sz.cellAspect());
         tty.write(presenter.frame(view.grid));
 
         double spent = std::chrono::duration<double>(clock::now() - t0).count() - now;

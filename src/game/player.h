@@ -11,6 +11,8 @@ struct Controls {
     bool run = false;
     bool fire = false;  // held
     bool use = false;   // pressed this tick
+    int weaponSlot = 0; // 1-based slot pressed this tick, 0 = none
+    bool nextWeapon = false;
 };
 
 struct Body {

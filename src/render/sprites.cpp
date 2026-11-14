@@ -272,6 +272,16 @@ std::array<Image, static_cast<size_t>(SpriteId::Count)> makeAll() {
         ".ksssssssssskkkssssssssk..",
         ".ksssssssssssssssssssssk..",
     }));
+    set(SpriteId::Fireball, build({
+        "...oyyo...",
+        "..oyffyo..",
+        ".oyffffyo.",
+        "oyfffffffo",
+        "oyfffffyo.",
+        ".oyffffyo.",
+        "..oyffyo..",
+        "...oyyo...",
+    }));
     return a;
 }
 

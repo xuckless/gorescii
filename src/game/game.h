@@ -1,25 +1,127 @@
 #pragma once
 // Game state and simulation, independent of the terminal.
+#include <cstdint>
+#include <deque>
+#include <random>
+#include <string>
+#include <vector>
+
 #include "game/player.h"
 #include "render/renderer.h"
 #include "world/map.h"
 
 namespace tg::game {
 
+enum class Weapon : uint8_t { Pistol, Scattergun };
+enum class State : uint8_t { Playing, Dead, Won };
+
+struct Enemy {
+    enum class AI : uint8_t { Idle, Chase, Attack, Pain, Dead };
+    ThingType type = ThingType::Grunt;
+    Body body;
+    int health = 0;
+    AI ai = AI::Idle;
+    float timer = 0;     // time left in Attack / Pain, or until next sight check
+    float cooldown = 0;  // until the next attack may start
+    bool fired = false;  // this attack's shot has gone off
+    float stuck = 0;
+    float wander = 0;
+    Vec2 wanderDir;
+    float flash = 0;     // hit flash
+    uint32_t id = 0;
+    bool alive() const { return ai != AI::Dead; }
+};
+
+struct Pickup {
+    ThingType type;
+    Vec2 pos;
+    int sector = -1;
+    bool taken = false;
+    uint32_t id = 0;
+};
+
+struct Projectile {
+    Vec2 pos;
+    float z = 0;
+    Vec2 vel;
+    int sector = -1;
+    int damage = 0;
+    uint32_t id = 0;
+};
+
+struct Message {
+    std::string text;
+    float time = 0;
+};
+
+struct WeaponView {
+    render::SpriteId sprite;
+    float bobX = 0, bobY = 0;  // fractions of screen height
+    bool flash = false;
+};
+
 class Game {
 public:
-    explicit Game(Map map);
+    explicit Game(Map map, uint32_t seed = 1);
 
     void update(const Controls& c, float dt);
     render::Camera camera() const;
+    void collectSprites(std::vector<render::SpriteInstance>& out) const;
+    WeaponView weaponView() const;
 
     const Map& map() const { return map_; }
     const Body& player() const { return player_; }
+    State state() const { return state_; }
+    int health() const { return health_; }
+    int armor() const { return armor_; }
+    int ammo() const { return ammo_; }
+    Weapon weapon() const { return weapon_; }
+    int kills() const { return kills_; }
+    int totalEnemies() const { return static_cast<int>(enemies_.size()); }
+    float elapsed() const { return elapsed_; }
+    float damageFlash() const { return damageFlash_; }
+    float pickupFlash() const { return pickupFlash_; }
+    float muzzleFlash() const { return fireAnim_ > 0 ? 1.0f : 0.0f; }
+    const std::deque<Message>& messages() const { return messages_; }
+
+    // Exposed for tests.
+    std::vector<Enemy>& enemies() { return enemies_; }
+    void damagePlayer(int amount);
 
 private:
+    float rand01();
+    int randRange(int lo, int hi);
+    void say(std::string text);
+
+    void updateWeapon(const Controls& c, float dt);
+    void fireHitscan(float spreadRad, int pellets, int dmgLo, int dmgHi);
+    void damageEnemy(Enemy& e, int amount);
+    void alert(Vec2 pos, float radius);
+    void updateEnemy(Enemy& e, float dt);
+    void enemyAttack(Enemy& e);
+    void updateProjectiles(float dt);
+    void updatePickups();
+    void separateBodies();
+    float eyeZ() const { return player_.z + Body::kEye; }
+
     Map map_;
     Body player_;
-    float viewZ_ = 0;    // smoothed eye height (stairs, landings)
+    std::vector<Enemy> enemies_;
+    std::vector<Pickup> pickups_;
+    std::vector<Projectile> projectiles_;
+    std::deque<Message> messages_;
+    std::mt19937 rng_;
+    uint32_t nextId_ = 1;
+
+    State state_ = State::Playing;
+    int health_ = 100, armor_ = 0, ammo_ = 50;
+    Weapon weapon_ = Weapon::Pistol;
+    float fireCooldown_ = 0, fireAnim_ = 0, noAmmoMsg_ = 0;
+    float damageFlash_ = 0, pickupFlash_ = 0, slimeAcc_ = 0;
+    int kills_ = 0;
+    float elapsed_ = 0;
+
+    float viewZ_ = 0;  // smoothed eye height (stairs, landings)
     float bobPhase_ = 0;
     float bob_ = 0;
 };

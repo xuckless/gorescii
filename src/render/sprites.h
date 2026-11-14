@@ -29,6 +29,7 @@ enum class SpriteId : uint8_t {
     PistolFire,
     Scattergun,
     ScattergunFire,
+    Fireball,
     Count
 };
 
