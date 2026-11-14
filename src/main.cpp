@@ -6,6 +6,7 @@
 #include <string>
 #include <unistd.h>
 
+#include "game/game.h"
 #include "gfx/ascii.h"
 #include "gfx/present.h"
 #include "render/renderer.h"
@@ -79,18 +80,22 @@ struct View {
     }
 };
 
-render::Camera startCamera(const Map& map) {
-    const Thing* p = map.playerStart();
-    render::Camera cam;
-    cam.pos = p->pos;
-    cam.angle = p->angle;
-    cam.sector = map.sectorAt(cam.pos);
-    cam.z = map.sectors[static_cast<size_t>(cam.sector)].floor + 1.6f;
-    return cam;
+game::Controls readControls(const term::KeyState& k) {
+    using term::Key, term::keyChar;
+    auto axis = [&](bool pos, bool neg) { return (pos ? 1.0f : 0.0f) - (neg ? 1.0f : 0.0f); };
+    game::Controls c;
+    c.forward = axis(k.held(keyChar('w')) || k.held(Key::Up), k.held(keyChar('s')) || k.held(Key::Down));
+    c.strafe = axis(k.held(keyChar('d')), k.held(keyChar('a')));
+    c.turn = axis(k.held(Key::Left) || k.held(keyChar('j')), k.held(Key::Right) || k.held(keyChar('l')));
+    c.run = !k.held(Key::Shift);  // always run; hold Shift to walk (needs key-release support)
+    c.fire = k.held(Key::Space) || k.held(Key::Ctrl);
+    c.use = k.pressed(keyChar('e'));
+    return c;
 }
 
 int runSnapshot(const Map& map, const Options& o) {
-    render::Camera cam = startCamera(map);
+    game::Game g(map);
+    render::Camera cam = g.camera();
     if (o.snapAt) {
         cam.pos = {o.atX, o.atY};
         cam.angle = o.atAngle * 3.14159265f / 180.0f;
@@ -120,7 +125,7 @@ int runInteractive(const Map& map, const Options& o) {
     term::KeyState keys(tty.hasKeyReleaseEvents());
     gfx::Presenter presenter;
     View view;
-    render::Camera cam = startCamera(map);
+    game::Game g(map);
     std::string inbuf;
 
     using clock = std::chrono::steady_clock;
@@ -142,28 +147,11 @@ int runInteractive(const Map& map, const Options& o) {
         }
         if (quit) break;
 
-        // Free-fly viewer: no collision yet.
-        float speed = 4.0f * static_cast<float>(dt), turn = 2.2f * static_cast<float>(dt);
-        using term::Key, term::keyChar;
-        if (keys.held(Key::Left)) cam.angle += turn;
-        if (keys.held(Key::Right)) cam.angle -= turn;
-        Vec2 fwd{std::cos(cam.angle), std::sin(cam.angle)}, right{fwd.y, -fwd.x};
-        Vec2 move{};
-        if (keys.held(keyChar('w')) || keys.held(Key::Up)) move += fwd;
-        if (keys.held(keyChar('s')) || keys.held(Key::Down)) move -= fwd;
-        if (keys.held(keyChar('d'))) move += right;
-        if (keys.held(keyChar('a'))) move -= right;
-        Vec2 next = cam.pos + normalize(move) * speed;
-        int ns = map.sectorAt(next, cam.sector);
-        if (ns >= 0) {
-            cam.pos = next;
-            cam.sector = ns;
-            cam.z = map.sectors[static_cast<size_t>(ns)].floor + 1.6f;
-        }
+        g.update(readControls(keys), static_cast<float>(dt));
 
         if (tty.consumeResize()) presenter.invalidate();
         term::Size sz = tty.size();
-        view.draw(map, cam, sz.cols, sz.rows, o.cellW, sz.cellAspect());
+        view.draw(g.map(), g.camera(), sz.cols, sz.rows, o.cellW, sz.cellAspect());
         tty.write(presenter.frame(view.grid));
 
         double spent = std::chrono::duration<double>(clock::now() - t0).count() - now;
