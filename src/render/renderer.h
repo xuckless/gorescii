@@ -56,7 +56,7 @@ private:
     void drawSky(int x, int yStart, int yEnd);
 
     const Map* map_ = nullptr;
-    const Camera* cam_ = nullptr;
+    Camera cam_;  // copied: callers often pass a temporary
     gfx::Framebuffer* fb_ = nullptr;
     float focal_ = 1, horizon_ = 0;
     Vec2 fwd_, right_;

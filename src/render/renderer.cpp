@@ -47,7 +47,7 @@ float Renderer::shadeFor(float light, float dist) {
 
 void Renderer::render(const Map& map, const Camera& cam, gfx::Framebuffer& fb) {
     map_ = &map;
-    cam_ = &cam;
+    cam_ = cam;
     fb_ = &fb;
     const int w = fb.width, h = fb.height;
     focal_ = (w * 0.5f) / std::tan(cam.fovDeg * 3.14159265f / 360.0f);
@@ -87,7 +87,7 @@ void Renderer::drawFlat(int x, int yStart, int yEnd, const Sector& s, bool ceili
         drawSky(x, yStart, yEnd);
         return;
     }
-    float height = ceiling ? s.ceil - cam_->z : cam_->z - s.floor;
+    float height = ceiling ? s.ceil - cam_.z : cam_.z - s.floor;
     if (height <= 0) return;
     const Texture& tex = texture(ceiling ? s.ceilTex : s.floorTex);
     const uint32_t id = flatId(s, ceiling);
@@ -97,7 +97,7 @@ void Renderer::drawFlat(int x, int yStart, int yEnd, const Sector& s, bool ceili
         float dy = ceiling ? horizon_ - (y + 0.5f) : (y + 0.5f) - horizon_;
         if (dy <= 0) continue;
         float dist = height * focal_ / dy;
-        Vec2 p = cam_->pos + ray * dist;
+        Vec2 p = cam_.pos + ray * dist;
         gfx::Rgb c = tex.sample(static_cast<int>(std::floor(p.x * kTexelsPerMetre)),
                                 static_cast<int>(std::floor(-p.y * kTexelsPerMetre)));
         size_t i = static_cast<size_t>(y) * fb_->width + x;
@@ -110,16 +110,16 @@ void Renderer::drawFlat(int x, int yStart, int yEnd, const Sector& s, bool ceili
 void Renderer::drawSector(int sectorIndex, int x0, int x1, int depth) {
     if (depth > kMaxPortalDepth || x0 >= x1) return;
     const Sector& s = map_->sectors[static_cast<size_t>(sectorIndex)];
-    const float camZ = cam_->z;
+    const float camZ = cam_.z;
     const int w = fb_->width;
 
     for (size_t e = 0; e < s.edgeCount(); ++e) {
         // Only the inward face is visible (interior is on the left of a->b).
-        if (side(s.a(e), s.b(e), cam_->pos) <= 0) continue;
+        if (side(s.a(e), s.b(e), cam_.pos) <= 0) continue;
         // Seen from inside a CCW polygon, b is on screen-left of a: project b..a.
         Vec2 a = s.b(e), b = s.a(e);
 
-        Vec2 ra = a - cam_->pos, rb = b - cam_->pos;
+        Vec2 ra = a - cam_.pos, rb = b - cam_.pos;
         float da = dot(ra, fwd_), db = dot(rb, fwd_);
         float xa = dot(ra, right_), xb = dot(rb, right_);
         float edgeLen = length(b - a);
@@ -209,7 +209,7 @@ void Renderer::drawSprites(std::span<const SpriteInstance> sprites, gfx::Framebu
     const int w = fb.width, h = fb.height;
     for (const SpriteInstance& sp : sprites) {
         if (!sp.image || sp.image->w == 0) continue;
-        Vec2 rel = sp.pos - cam_->pos;
+        Vec2 rel = sp.pos - cam_.pos;
         float d = dot(rel, fwd_);
         if (d < 0.2f) continue;
         const Image& img = *sp.image;
@@ -217,8 +217,8 @@ void Renderer::drawSprites(std::span<const SpriteInstance> sprites, gfx::Framebu
         float worldW = sp.height * img.w / img.h;
         float cx = w * 0.5f + dot(rel, right_) * scale;
         float halfW = worldW * 0.5f * scale;
-        float top = horizon_ - (sp.z + sp.height - cam_->z) * scale;
-        float bottom = horizon_ - (sp.z - cam_->z) * scale;
+        float top = horizon_ - (sp.z + sp.height - cam_.z) * scale;
+        float bottom = horizon_ - (sp.z - cam_.z) * scale;
         int x0 = std::max(0, static_cast<int>(std::ceil(cx - halfW - 0.5f)));
         int x1 = std::min(w, static_cast<int>(std::ceil(cx + halfW - 0.5f)));
         int y0 = std::max(0, static_cast<int>(std::ceil(top - 0.5f)));
