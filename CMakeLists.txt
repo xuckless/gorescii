@@ -18,6 +18,7 @@ add_library(textgme_core STATIC
   src/term/input.cpp
   src/gfx/ascii.cpp
   src/gfx/present.cpp
+  src/world/map.cpp
 )
 target_include_directories(textgme_core PUBLIC src)
 target_compile_options(textgme_core PUBLIC -Wall -Wextra -Wpedantic -Wshadow)
@@ -31,7 +32,7 @@ target_link_libraries(textgme PRIVATE textgme_core)
 target_compile_definitions(textgme PRIVATE TEXTGME_ASSET_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets")
 
 enable_testing()
-add_executable(textgme_tests tests/main.cpp tests/input_test.cpp tests/ascii_test.cpp)
+add_executable(textgme_tests tests/main.cpp tests/input_test.cpp tests/ascii_test.cpp tests/map_test.cpp)
 target_link_libraries(textgme_tests PRIVATE textgme_core)
 target_compile_definitions(textgme_tests PRIVATE TEXTGME_ASSET_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets")
 add_test(NAME textgme_tests COMMAND textgme_tests)

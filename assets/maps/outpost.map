@@ -1,0 +1,38 @@
+# Outpost - the first level. Units are metres; see README.md for the format.
+name Outpost
+
+# Start room and the raised alcove off its west wall
+sector floor=0   ceil=3.5 light=0.7 wall=metal floortex=tile  ceiltex=panel : 0,0 8,0 8,3 8,5 8,8 0,8 0,5 0,3
+sector floor=0.6 ceil=2.6 light=1.0 wall=tech  floortex=tech  ceiltex=tech  : -2,3 0,3 0,5 -2,5
+
+# Low corridor east, then three steps up into the hall
+sector floor=0   ceil=2.6 light=0.5 wall=tech  floortex=metal ceiltex=metal : 8,3 14,3 14,5 8,5
+sector floor=0.4 ceil=3.2 light=0.6 wall=stone floortex=stone ceiltex=metal : 14,3 15,3 15,5 14,5
+sector floor=0.8 ceil=3.6 light=0.7 wall=stone floortex=stone ceiltex=metal : 15,3 16,3 16,5 15,5
+sector floor=1.2 ceil=4.0 light=0.8 wall=stone floortex=stone ceiltex=metal : 16,3 17,3 17,5 16,5
+
+# Open-air hall around a slime pit (four convex pieces plus the pit)
+sector floor=1.2 ceil=7 light=0.9 wall=stone floortex=dirt ceiltex=sky : 17,-4 29,-4 29,2 25,2 21,2 17,2
+sector floor=1.2 ceil=7 light=0.9 wall=stone floortex=dirt ceiltex=sky : 17,2 21,2 21,6 17,6 17,5 17,3
+sector floor=0.7 ceil=7 light=1.0 wall=stone floortex=slime ceiltex=sky damage=10 : 21,2 25,2 25,6 21,6
+sector floor=1.2 ceil=7 light=0.9 wall=stone floortex=dirt ceiltex=sky : 25,2 29,2 29,6 25,6
+sector floor=1.2 ceil=7 light=0.9 wall=stone floortex=dirt ceiltex=sky : 17,6 21,6 25,6 29,6 29,12 24,12 22,12 17,12
+
+# Neck, the dark north room, and the exit pad
+sector floor=1.2 ceil=3.6 light=0.5  wall=brick floortex=wood ceiltex=panel : 22,12 24,12 24,14 22,14
+sector floor=1.2 ceil=4.5 light=0.45 wall=brick floortex=wood ceiltex=panel : 18,14 22,14 24,14 28,14 28,22 24,22 22,22 18,22
+sector floor=1.4 ceil=3.0 light=1.0  wall=tech  floortex=tech ceiltex=tech exit : 22,22 24,22 24,24 22,24
+
+thing player 4,4 0
+thing armor  -1,4
+thing medkit 2,7
+thing grunt  11,4 180
+thing ammo   16.5,4
+thing grunt  23,-1 90
+thing ammo   27,-2
+thing grunt  27,9 180
+thing grunt  19,10 0
+thing brute  23,18 270
+thing grunt  20,20 270
+thing grunt  26,20 270
+thing medkit 19,20
