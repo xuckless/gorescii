@@ -1,4 +1,4 @@
-# TextGme
+# Gorescii
 
 A 2.5D first-person shooter that runs in your terminal. The world is drawn
 by a software sector renderer, then turned into coloured ASCII by a CPU
@@ -12,7 +12,7 @@ Needs a C++20 compiler and CMake 3.20+ (macOS or Linux). No other dependencies.
 ```sh
 cmake -S . -B build
 cmake --build build -j
-./build/textgme
+./build/gorescii
 ctest --test-dir build      # unit tests
 ```
 

@@ -40,7 +40,7 @@ TEST(map_rejects_t_junction) {
 
 TEST(outpost_map_loads) {
     MapError err;
-    auto m = loadMap(std::string(TEXTGME_ASSET_DIR) + "/maps/outpost.map", err);
+    auto m = loadMap(std::string(GORESCII_ASSET_DIR) + "/maps/outpost.map", err);
     if (!m) std::fprintf(stderr, "  line %d: %s\n", err.line, err.message.c_str());
     CHECK(m.has_value());
     if (!m) return;
@@ -84,7 +84,7 @@ TEST(trace_through_portals_and_steps) {
 
 TEST(pumping_station_loads_with_movers) {
     MapError err;
-    auto m = loadMap(std::string(TEXTGME_ASSET_DIR) + "/maps/pumping-station.map", err);
+    auto m = loadMap(std::string(GORESCII_ASSET_DIR) + "/maps/pumping-station.map", err);
     if (!m) std::fprintf(stderr, "  line %d: %s\n", err.line, err.message.c_str());
     CHECK(m.has_value());
     if (!m) return;

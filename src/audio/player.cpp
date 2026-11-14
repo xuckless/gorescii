@@ -50,7 +50,7 @@ bool Player::init() {
     if (backend_.empty()) return false;
 
     const char* tmp = std::getenv("TMPDIR");
-    std::string tmpl = std::string(tmp && *tmp ? tmp : "/tmp") + "/textgme-sfx-XXXXXX";
+    std::string tmpl = std::string(tmp && *tmp ? tmp : "/tmp") + "/gorescii-sfx-XXXXXX";
     std::vector<char> buf(tmpl.begin(), tmpl.end());
     buf.push_back('\0');
     if (!mkdtemp(buf.data())) {

@@ -26,7 +26,7 @@ using namespace tg;
 
 struct Options {
     std::string mapPath;  // empty: play the campaign
-    std::string campaignPath = std::string(TEXTGME_ASSET_DIR) + "/maps/campaign.txt";
+    std::string campaignPath = std::string(GORESCII_ASSET_DIR) + "/maps/campaign.txt";
     int cellW = 4;
     bool mouse = true;
     bool sound = true;
@@ -40,7 +40,7 @@ struct Options {
 
 void usage() {
     std::puts(
-        "usage: textgme [--map FILE] [--cell-width N] [--mouse-sens X] [--no-mouse]\n"
+        "usage: gorescii [--map FILE] [--cell-width N] [--mouse-sens X] [--no-mouse]\n"
         "               [--no-sound]\n"
         "               [--style clean|lines|off]\n"
         "               [--snapshot COLSxROWS] [--at X,Y,DEG]\n"
@@ -85,7 +85,7 @@ bool parseArgs(int argc, char** argv, Options& o) {
             if (!v || std::sscanf(v, "%f,%f,%f", &o.atX, &o.atY, &o.atAngle) != 3) return false;
             o.snapAt = true;
         } else if (a == "--version") {
-            std::printf("textgme %s\n", version());
+            std::printf("gorescii %s\n", version());
             std::exit(0);
         } else {
             return false;
@@ -250,7 +250,7 @@ int runSnapshot(const Map& map, const Options& o) {
 int runInteractive(const std::vector<Map>& levels, const Options& o) {
     term::Terminal tty;
     if (!tty.enter(o.mouse)) {
-        std::fprintf(stderr, "textgme needs an interactive terminal (try --snapshot)\n");
+        std::fprintf(stderr, "gorescii needs an interactive terminal (try --snapshot)\n");
         return 1;
     }
     term::KeyState keys(tty.hasKeyReleaseEvents());

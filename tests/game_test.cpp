@@ -222,7 +222,7 @@ bool follow(Game& g, const std::vector<Step>& route, std::string& where) {
 
 TEST(pumping_station_is_beatable) {
     MapError err;
-    auto m = loadMap(std::string(TEXTGME_ASSET_DIR) + "/maps/pumping-station.map", err);
+    auto m = loadMap(std::string(GORESCII_ASSET_DIR) + "/maps/pumping-station.map", err);
     CHECK(m.has_value());
     if (!m) return;
     std::erase_if(m->things, [](const Thing& t) { return t.type == ThingType::Grunt || t.type == ThingType::Brute; });

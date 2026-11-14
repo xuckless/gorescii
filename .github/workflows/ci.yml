@@ -21,17 +21,17 @@ jobs:
       - name: Test
         run: ctest --test-dir build --output-on-failure
       - name: Snapshot
-        run: ./build/textgme --snapshot 100x30
+        run: ./build/gorescii --snapshot 100x30
 
   sanitizers:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Configure
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DTEXTGME_SANITIZE=ON
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DGORESCII_SANITIZE=ON
       - name: Build
         run: cmake --build build -j
       - name: Test
         run: ctest --test-dir build --output-on-failure
       - name: Snapshot
-        run: ./build/textgme --snapshot 80x24 --at 23,16,90
+        run: ./build/gorescii --snapshot 80x24 --at 23,16,90

@@ -69,7 +69,7 @@ TEST(player_falls_off_ledge_under_gravity) {
 
 TEST(outpost_start_to_hall_walkthrough) {
     MapError err;
-    auto m = loadMap(std::string(TEXTGME_ASSET_DIR) + "/maps/outpost.map", err);
+    auto m = loadMap(std::string(GORESCII_ASSET_DIR) + "/maps/outpost.map", err);
     CHECK(m.has_value());
     if (!m) return;
     Body b;
