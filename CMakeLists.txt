@@ -46,3 +46,8 @@ add_executable(gorescii_tests tests/main.cpp tests/input_test.cpp tests/ascii_te
 target_link_libraries(gorescii_tests PRIVATE gorescii_core)
 target_compile_definitions(gorescii_tests PRIVATE GORESCII_ASSET_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets")
 add_test(NAME gorescii_tests COMMAND gorescii_tests)
+
+# Regenerates the animated SVGs in docs/readme from the engine.
+add_executable(gorescii_readme_art tools/readme_art.cpp)
+target_link_libraries(gorescii_readme_art PRIVATE gorescii_core)
+target_compile_definitions(gorescii_readme_art PRIVATE GORESCII_ASSET_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets")
