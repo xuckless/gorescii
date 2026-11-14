@@ -48,7 +48,9 @@ float rayCircle(Vec2 o, Vec2 d, Vec2 c, float r) {
 
 }  // namespace
 
-Game::Game(Map map, uint32_t seed) : map_(std::move(map)), rng_(seed) {
+Game::Game(Map map, uint32_t seed, Loadout carry)
+    : map_(std::move(map)), rng_(seed), health_(carry.health), armor_(carry.armor), ammo_(carry.ammo),
+      weapon_(carry.weapon) {
     const Thing* start = map_.playerStart();
     player_.pos = start->pos;
     player_.angle = start->angle;
@@ -126,7 +128,7 @@ void Game::update(const Controls& c, float dt) {
     }
     if (s.exit && state_ == State::Playing) {
         state_ = State::Won;
-        say("Outpost cleared.");
+        say(map_.name.empty() ? std::string("Level cleared.") : map_.name + " cleared.");
     }
 
     float target = player_.z + Body::kEye;

@@ -161,6 +161,13 @@ TEST(lift_lowers_waits_and_rises) {
     CHECK(l.map().sectors[3].floor >= 1.99f);
 }
 
+TEST(loadout_carries_into_the_next_level) {
+    Loadout carry{60, 25, 90, Weapon::Scattergun};
+    Game g(arena(""), 1, carry);
+    CHECK(g.health() == 60 && g.armor() == 25 && g.ammo() == 90 && g.weapon() == Weapon::Scattergun);
+    Loadout out = g.loadout();
+    CHECK(out.health == 60 && out.ammo == 90);
+}
 
 namespace {
 struct Step {

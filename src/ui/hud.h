@@ -14,6 +14,8 @@ struct HudInfo {
     bool paused = false;
     bool showHelp = false;
     std::string toast;  // short-lived UI notice (look toggles, terminal tips)
+    bool hasNextLevel = false;
+    int level = 1, levelCount = 1;
 };
 
 void drawHud(gfx::CellGrid& screen, const game::Game& g, const HudInfo& info);

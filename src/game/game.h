@@ -56,6 +56,12 @@ struct ActiveMover {
     float wait = 0;   // > 0 while parked at the far end
 };
 
+// What the player carries from one level to the next.
+struct Loadout {
+    int health = 100, armor = 0, ammo = 50;
+    Weapon weapon = Weapon::Pistol;
+};
+
 struct Message {
     std::string text;
     float time = 0;
@@ -69,7 +75,8 @@ struct WeaponView {
 
 class Game {
 public:
-    explicit Game(Map map, uint32_t seed = 1);
+    explicit Game(Map map, uint32_t seed = 1, Loadout carry = {});
+    Loadout loadout() const { return {health_, armor_, ammo_, weapon_}; }
 
     void update(const Controls& c, float dt);
     render::Camera camera() const;
@@ -129,8 +136,8 @@ private:
     uint32_t nextId_ = 1;
 
     State state_ = State::Playing;
-    int health_ = 100, armor_ = 0, ammo_ = 50;
-    Weapon weapon_ = Weapon::Pistol;
+    int health_, armor_, ammo_;
+    Weapon weapon_;
     float fireCooldown_ = 0, fireAnim_ = 0, noAmmoMsg_ = 0;
     float damageFlash_ = 0, pickupFlash_ = 0, slimeAcc_ = 0;
     int kills_ = 0;

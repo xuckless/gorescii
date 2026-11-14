@@ -1,7 +1,9 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <cctype>
 #include <cstring>
+#include <fstream>
 #include <poll.h>
 #include <string>
 #include <vector>
@@ -22,7 +24,8 @@ namespace {
 using namespace tg;
 
 struct Options {
-    std::string mapPath = std::string(TEXTGME_ASSET_DIR) + "/maps/outpost.map";
+    std::string mapPath;  // empty: play the campaign
+    std::string campaignPath = std::string(TEXTGME_ASSET_DIR) + "/maps/campaign.txt";
     int cellW = 4;
     bool mouse = true;
     gfx::EdgeStyle style = gfx::EdgeStyle::Clean;
@@ -38,6 +41,7 @@ void usage() {
         "usage: textgme [--map FILE] [--cell-width N] [--mouse-sens X] [--no-mouse]\n"
         "               [--style clean|lines|off]\n"
         "               [--snapshot COLSxROWS] [--at X,Y,DEG]\n"
+        "  --map       play one map instead of the campaign\n"
         "  --snapshot  render one frame as plain text to stdout and exit");
 }
 
@@ -180,6 +184,38 @@ game::Controls readControls(const term::KeyState& k) {
     return c;
 }
 
+// Loads every level up front so a broken map fails before the game starts.
+bool loadLevels(const Options& o, std::vector<Map>& out) {
+    std::vector<std::string> paths;
+    if (!o.mapPath.empty()) {
+        paths.push_back(o.mapPath);
+    } else {
+        std::ifstream f(o.campaignPath);
+        if (!f) {
+            std::fprintf(stderr, "cannot open %s\n", o.campaignPath.c_str());
+            return false;
+        }
+        std::string dir = o.campaignPath.substr(0, o.campaignPath.find_last_of('/') + 1);
+        for (std::string line; std::getline(f, line);) {
+            if (auto h = line.find('#'); h != std::string::npos) line.erase(h);
+            while (!line.empty() && std::isspace(static_cast<unsigned char>(line.back()))) line.pop_back();
+            while (!line.empty() && std::isspace(static_cast<unsigned char>(line.front()))) line.erase(0, 1);
+            if (!line.empty()) paths.push_back(dir + line);
+        }
+    }
+    for (const std::string& p : paths) {
+        MapError err;
+        auto m = loadMap(p, err);
+        if (!m) {
+            std::fprintf(stderr, "%s:%d: %s\n", p.c_str(), err.line, err.message.c_str());
+            return false;
+        }
+        out.push_back(std::move(*m));
+    }
+    if (out.empty()) std::fprintf(stderr, "no levels to play\n");
+    return !out.empty();
+}
+
 int runSnapshot(const Map& map, const Options& o) {
     game::Game g(map);
     if (o.snapAt) {
@@ -206,7 +242,7 @@ int runSnapshot(const Map& map, const Options& o) {
     return 0;
 }
 
-int runInteractive(const Map& map, const Options& o) {
+int runInteractive(const std::vector<Map>& levels, const Options& o) {
     term::Terminal tty;
     if (!tty.enter(o.mouse)) {
         std::fprintf(stderr, "textgme needs an interactive terminal (try --snapshot)\n");
@@ -218,10 +254,13 @@ int runInteractive(const Map& map, const Options& o) {
     gfx::Presenter presenter;
     View view;
     view.setStyle(o.style);
-    game::Game g(map);
+    size_t level = 0;
+    game::Loadout levelStart;  // what the player had entering this level
+    game::Game g(levels[0]);
     std::string inbuf;
     bool paused = false;
     ui::HudInfo hud;
+    hud.levelCount = static_cast<int>(levels.size());
     double toastUntil = 0, helpUntil = 8.0;
     auto toast = [&](std::string t, double now, double secs = 2.0) {
         hud.toast = std::move(t);
@@ -270,8 +309,15 @@ int runInteractive(const Map& map, const Options& o) {
         }
 
         if (g.state() != game::State::Playing && keys.pressed(term::Key::Enter)) {
-            g = game::Game(map, static_cast<uint32_t>(now * 1000));
-            helpUntil = now + 4.0;
+            if (g.state() == game::State::Won) {
+                bool more = level + 1 < levels.size();
+                levelStart = more ? g.loadout() : game::Loadout{};
+                level = more ? level + 1 : 0;
+            }
+            // After a death the level restarts with what the player brought into it.
+            g = game::Game(levels[level], static_cast<uint32_t>(now * 1000), levelStart);
+            helpUntil = level == 0 ? now + 4.0 : 0;
+            toast(levels[level].name.empty() ? "Level " + std::to_string(level + 1) : levels[level].name, now, 2.5);
         }
         if (!paused) {
             game::Controls controls = readControls(keys);
@@ -280,6 +326,8 @@ int runInteractive(const Map& map, const Options& o) {
         }
         if (now > toastUntil) hud.toast.clear();
         hud.paused = paused;
+        hud.level = static_cast<int>(level) + 1;
+        hud.hasNextLevel = level + 1 < levels.size();
         hud.showHelp = now < helpUntil;
 
         if (tty.consumeResize()) presenter.invalidate();
@@ -304,11 +352,7 @@ int main(int argc, char** argv) {
         usage();
         return 2;
     }
-    MapError err;
-    auto map = loadMap(opts.mapPath, err);
-    if (!map) {
-        std::fprintf(stderr, "%s:%d: %s\n", opts.mapPath.c_str(), err.line, err.message.c_str());
-        return 1;
-    }
-    return opts.snapshot ? runSnapshot(*map, opts) : runInteractive(*map, opts);
+    std::vector<Map> levels;
+    if (!loadLevels(opts, levels)) return 1;
+    return opts.snapshot ? runSnapshot(levels[0], opts) : runInteractive(levels, opts);
 }

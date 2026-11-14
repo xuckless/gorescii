@@ -23,7 +23,7 @@ smaller fonts mean more detail.
 
 | Flag | |
 |---|---|
-| `--map FILE` | play another map (see `assets/maps/README.md`) |
+| `--map FILE` | play one map instead of the campaign (`assets/maps/campaign.txt`; format in `assets/maps/README.md`) |
 | `--cell-width N` | pixels rendered per cell column (default 4; lower is faster) |
 | `--mouse-sens X` / `--no-mouse` | mouse look sensitivity, or turn it off |
 | `--style clean\|lines\|off` | edge look: geometry only (default), texture detail in line glyphs too, or none |

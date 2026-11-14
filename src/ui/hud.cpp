@@ -1,6 +1,7 @@
 #include "ui/hud.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdio>
 #include <string_view>
 #include <vector>
@@ -112,7 +113,11 @@ void drawHud(gfx::CellGrid& s, const game::Game& g, const HudInfo& info) {
     x = put(s, x + 2, y, "2 SCATTERGUN", pistol ? kDim : kYellow, &kBarBg);
     if (g.hasKey(KeyColor::Red)) x = put(s, x + 2, y, "▮", kRed, &kBarBg);
     if (g.hasKey(KeyColor::Blue)) x = put(s, x + (g.hasKey(KeyColor::Red) ? 1 : 2), y, "▮", kBlue, &kBarBg);
-    std::snprintf(num, sizeof num, "KILLS %d/%d  %s", g.kills(), g.totalEnemies(), clock(g.elapsed()).c_str());
+    if (info.levelCount > 1)
+        std::snprintf(num, sizeof num, "LEVEL %d/%d  KILLS %d/%d  %s", info.level, info.levelCount, g.kills(),
+                      g.totalEnemies(), clock(g.elapsed()).c_str());
+    else
+        std::snprintf(num, sizeof num, "KILLS %d/%d  %s", g.kills(), g.totalEnemies(), clock(g.elapsed()).c_str());
     int right = s.cols - width(num) - 1;
     if (right > x + 1) put(s, right, y, num, kLabel, &kBarBg);
 
@@ -135,7 +140,15 @@ void drawHud(gfx::CellGrid& s, const game::Game& g, const HudInfo& info) {
         dialog(s, sceneRows, "YOU DIED", kRed, {"Enter  try again", "Ctrl-C  quit"});
     } else if (g.state() == game::State::Won) {
         std::snprintf(num, sizeof num, "Kills %d/%d   Time %s", g.kills(), g.totalEnemies(), clock(g.elapsed()).c_str());
-        dialog(s, sceneRows, "OUTPOST CLEARED", kGreen, {num, "", "Enter  play again", "Ctrl-C  quit"});
+        std::string title = g.map().name.empty() ? std::string("LEVEL") : g.map().name;
+        for (char& ch : title) ch = static_cast<char>(std::toupper(static_cast<unsigned char>(ch)));
+        title += " CLEARED";
+        bool last = !info.hasNextLevel;
+        std::vector<std::string> lines{num, ""};
+        if (last && info.levelCount > 1) lines.insert(lines.begin(), "All levels complete!");
+        lines.push_back(last ? "Enter  play again from the start" : "Enter  next level");
+        lines.push_back("Ctrl-C  quit");
+        dialog(s, sceneRows, title, kGreen, lines);
     } else if (info.paused) {
         dialog(s, sceneRows, "PAUSED", kText,
                {"Esc  resume        X  quit", "", "C  colour mode   V  edge style   B  background"});
