@@ -26,6 +26,7 @@ add_library(gorescii_core STATIC
   src/game/player.cpp
   src/game/game.cpp
   src/ui/hud.cpp
+  src/ui/view.cpp
   src/audio/synth.cpp
   src/audio/player.cpp
 )

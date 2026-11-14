@@ -16,6 +16,7 @@
 #include "render/renderer.h"
 #include "term/input.h"
 #include "ui/hud.h"
+#include "ui/view.h"
 #include "term/terminal.h"
 #include "version.h"
 #include "world/map.h"
@@ -93,68 +94,6 @@ bool parseArgs(int argc, char** argv, Options& o) {
     }
     return true;
 }
-
-struct View {
-    gfx::Framebuffer fb;
-    gfx::CellGrid scene, grid;
-    gfx::AsciiShader shader;
-    render::Renderer renderer;
-
-    std::vector<render::SpriteInstance> sprites;
-
-    void draw(const game::Game& g, int cols, int rows, int cellW, double cellAspect, const ui::HudInfo& hud) {
-        int cellH = std::max(1, static_cast<int>(std::lround(cellW * cellAspect)));
-        int sceneRows = std::max(1, rows - ui::kStatusRows);
-        if (grid.cols != cols || grid.rows != rows) grid.resize(cols, rows);
-        if (scene.cols != cols || scene.rows != sceneRows) scene.resize(cols, sceneRows);
-        if (fb.width != cols * cellW || fb.height != sceneRows * cellH) fb.resize(cols * cellW, sceneRows * cellH);
-        renderer.render(g.map(), g.camera(), fb);
-        g.collectSprites(sprites);
-        renderer.drawSprites(sprites, fb);
-        game::WeaponView wv = g.weaponView();
-        float px = fb.height / 48.0f;
-        renderer.drawOverlay(render::sprite(wv.sprite), fb.width * (0.5f + wv.bobX), fb.height * (1.0f + wv.bobY) + px,
-                             px, wv.flash ? 1.3f : 0.9f, fb);
-        ui::flashFrame(fb, g);
-        shader.apply(fb, cellW, cellH, scene);
-        std::copy(scene.cells.begin(), scene.cells.end(), grid.cells.begin());
-        ui::drawHud(grid, g, hud);
-    }
-
-    // C cycles colour / green phosphor / amber; V toggles edges; B background.
-    std::string cycleColor() {
-        auto& st = shader.settings;
-        if (st.colorBlend > 0.5f) {
-            st.colorBlend = 0;
-            st.tint = {80, 255, 120};
-            return "Colour: green phosphor";
-        }
-        if (st.tint.r < 200) {
-            st.tint = {255, 180, 60};
-            return "Colour: amber";
-        }
-        st.colorBlend = 1;
-        st.tint = {255, 255, 255};
-        return "Colour: full";
-    }
-    gfx::EdgeStyle style = gfx::EdgeStyle::Clean;
-    void setStyle(gfx::EdgeStyle st) {
-        style = st;
-        gfx::applyEdgeStyle(shader.settings, st);
-    }
-    // V cycles clean -> lines -> off.
-    std::string cycleEdges() {
-        setStyle(style == gfx::EdgeStyle::Clean   ? gfx::EdgeStyle::Lines
-                 : style == gfx::EdgeStyle::Lines ? gfx::EdgeStyle::Off
-                                                  : gfx::EdgeStyle::Clean);
-        return std::string("Edges: ") + gfx::edgeStyleName(style);
-    }
-    std::string toggleBackground() {
-        auto& b = shader.settings.backgroundBlend;
-        b = b > 0 ? 0.0f : 0.3f;
-        return b > 0 ? "Background fill on" : "Background fill off";
-    }
-};
 
 // Mouse look: horizontal motion turns (a full window width = half a turn at
 // sensitivity 1). Terminals cannot capture the pointer, so resting it in the
@@ -236,7 +175,7 @@ int runSnapshot(const Map& map, const Options& o) {
         }
         g = game::Game(moved);
     }
-    View view;
+    ui::View view;
     view.setStyle(o.style);
     view.draw(g, o.snapCols, o.snapRows, o.cellW, 2.0, ui::HudInfo{});
     for (int y = 0; y < view.grid.rows; ++y) {
@@ -257,7 +196,7 @@ int runInteractive(const std::vector<Map>& levels, const Options& o) {
     term::MouseState mouse;
     std::vector<term::MouseEvent> mouseEvents;
     gfx::Presenter presenter;
-    View view;
+    ui::View view;
     view.setStyle(o.style);
     size_t level = 0;
     game::Loadout levelStart;  // what the player had entering this level
