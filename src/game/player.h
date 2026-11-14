@@ -8,6 +8,7 @@ struct Controls {
     float forward = 0;  // -1..1
     float strafe = 0;   // -1..1, + is right
     float turn = 0;     // -1..1, + is left (counter-clockwise)
+    float look = 0;     // radians to turn this tick (mouse), + is left
     bool run = false;
     bool fire = false;  // held
     bool use = false;   // pressed this tick

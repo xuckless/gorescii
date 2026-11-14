@@ -1,6 +1,8 @@
 #include "check.h"
 #include "term/input.h"
 
+#include <cmath>
+
 using namespace tg::term;
 
 TEST(decode_legacy_chars_and_arrows) {
@@ -59,4 +61,41 @@ TEST(keystate_release_events) {
     CHECK(ks.held(keyChar('w')));
     ks.apply({keyChar('w'), KeyAction::Release}, 5.0);
     CHECK(!ks.held(keyChar('w')));
+}
+
+TEST(decode_sgr_mouse) {
+    std::string b = "\x1b[<35;10;5M\x1b[<0;12;5M\x1b[<0;12;5m\x1b[<65;1;1M\x1b[<2;3;4Mw";
+    std::vector<MouseEvent> mouse;
+    auto keys = decode(b, &mouse);
+    CHECK(keys.size() == 1 && keys[0].key == keyChar('w'));
+    CHECK(mouse.size() == 5);
+    if (mouse.size() != 5) return;
+    CHECK(mouse[0].motion && mouse[0].button == -1 && mouse[0].x == 10 && mouse[0].y == 5);
+    CHECK(mouse[1].press && mouse[1].button == 0);
+    CHECK(mouse[2].release && mouse[2].button == 0);
+    CHECK(mouse[3].wheel == -1);
+    CHECK(mouse[4].press && mouse[4].button == 2);
+}
+
+TEST(decode_focus_and_decrpm_reply) {
+    std::string b = "\x1b[O\x1b[?1016;2$y\x1b[I";
+    auto ev = decode(b);
+    CHECK(ev.size() == 2);
+    if (ev.size() == 2) CHECK(ev[0].key == Key::FocusOut && ev[1].key == Key::FocusIn);
+}
+
+TEST(mouse_state_tracks_motion_and_buttons) {
+    MouseState m;
+    m.beginFrame();
+    m.apply({51, 10, -1, false, false, true, 0}, 0, 101, 20);
+    CHECK(m.dx() == 0);  // first report only sets the position
+    m.beginFrame();
+    m.apply({61, 10, -1, false, false, true, 0}, 0.1, 101, 20);
+    m.apply({0 + 71, 10, 0, true, false, false, 0}, 0.1, 101, 20);
+    CHECK(std::abs(m.dx() - 0.2f) < 1e-4f);
+    CHECK(m.left());
+    m.apply({71, 10, 0, false, true, false, 0}, 0.2, 101, 20);
+    CHECK(!m.left());
+    m.apply({71, 10, 2, true, false, false, 0}, 0.2, 101, 20);
+    CHECK(m.rightPressed() && m.right());
 }

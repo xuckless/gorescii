@@ -83,7 +83,7 @@ void moveAndSlide(const Map& map, Body& b, Vec2 delta) {
 }
 
 void stepPlayer(const Map& map, Body& b, const Controls& c, float dt) {
-    b.angle += c.turn * kTurnSpeed * (c.run ? 1.3f : 1.0f) * dt;
+    b.angle += c.turn * kTurnSpeed * (c.run ? 1.3f : 1.0f) * dt + c.look;
     b.angle = std::remainder(b.angle, 2.0f * 3.14159265f);
 
     Vec2 fwd{std::cos(b.angle), std::sin(b.angle)}, right{fwd.y, -fwd.x};

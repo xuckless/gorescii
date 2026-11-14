@@ -4,6 +4,7 @@
 #include <cstring>
 #include <poll.h>
 #include <string>
+#include <vector>
 #include <unistd.h>
 
 #include "game/game.h"
@@ -22,6 +23,8 @@ using namespace tg;
 struct Options {
     std::string mapPath = std::string(TEXTGME_ASSET_DIR) + "/maps/outpost.map";
     int cellW = 4;
+    bool mouse = true;
+    float mouseSens = 1.0f;
     bool snapshot = false;
     int snapCols = 120, snapRows = 40;
     bool snapAt = false;
@@ -30,7 +33,7 @@ struct Options {
 
 void usage() {
     std::puts(
-        "usage: textgme [--map FILE] [--cell-width N]\n"
+        "usage: textgme [--map FILE] [--cell-width N] [--mouse-sens X] [--no-mouse]\n"
         "               [--snapshot COLSxROWS] [--at X,Y,DEG]\n"
         "  --snapshot  render one frame as plain text to stdout and exit");
 }
@@ -47,6 +50,12 @@ bool parseArgs(int argc, char** argv, Options& o) {
             const char* v = next();
             if (!v) return false;
             o.cellW = std::clamp(std::atoi(v), 1, 8);
+        } else if (a == "--no-mouse") {
+            o.mouse = false;
+        } else if (a == "--mouse-sens") {
+            const char* v = next();
+            if (!v) return false;
+            o.mouseSens = std::clamp(static_cast<float>(std::atof(v)), 0.05f, 10.0f);
         } else if (a == "--snapshot") {
             const char* v = next();
             if (!v || std::sscanf(v, "%dx%d", &o.snapCols, &o.snapRows) != 2) return false;
@@ -87,6 +96,23 @@ struct View {
         shader.apply(fb, cellW, cellH, grid);
     }
 };
+
+// Mouse look: horizontal motion turns (a full window width = half a turn at
+// sensitivity 1). Terminals cannot capture the pointer, so resting it in the
+// outer edge zone keeps turning, until no mouse event has arrived for a while
+// (the pointer probably left the window).
+void applyMouse(game::Controls& c, const term::MouseState& m, double now, float sens) {
+    constexpr float kEdge = 0.05f;
+    constexpr double kEdgeTimeout = 2.0;
+    c.look -= m.dx() * 3.14159265f * sens;
+    if (m.hasPosition() && now - m.lastEventTime() < kEdgeTimeout) {
+        if (m.x() < kEdge) c.turn += (kEdge - m.x()) / kEdge * sens;
+        if (m.x() > 1 - kEdge) c.turn -= (m.x() - (1 - kEdge)) / kEdge * sens;
+        c.turn = std::clamp(c.turn, -1.5f, 1.5f);
+    }
+    c.fire = c.fire || m.left();
+    c.nextWeapon = c.nextWeapon || m.rightPressed() || m.wheel() != 0;
+}
 
 game::Controls readControls(const term::KeyState& k) {
     using term::Key, term::keyChar;
@@ -131,11 +157,13 @@ int runSnapshot(const Map& map, const Options& o) {
 
 int runInteractive(const Map& map, const Options& o) {
     term::Terminal tty;
-    if (!tty.enter()) {
+    if (!tty.enter(o.mouse)) {
         std::fprintf(stderr, "textgme needs an interactive terminal (try --snapshot)\n");
         return 1;
     }
     term::KeyState keys(tty.hasKeyReleaseEvents());
+    term::MouseState mouse;
+    std::vector<term::MouseEvent> mouseEvents;
     gfx::Presenter presenter;
     View view;
     game::Game g(map);
@@ -151,19 +179,32 @@ int runInteractive(const Map& map, const Options& o) {
         last = now;
 
         keys.beginFrame(now);
+        mouse.beginFrame();
         tty.readAvailable(inbuf);
         bool quit = false;
-        for (const auto& e : term::decode(inbuf)) {
+        mouseEvents.clear();
+        for (const auto& e : term::decode(inbuf, &mouseEvents)) {
             if (e.key == term::Key::Escape || (e.ctrl && e.key == term::keyChar('c'))) quit = true;
+            if (e.key == term::Key::FocusOut) {
+                keys.releaseAll();
+                mouse.releaseAll();
+                continue;
+            }
             keys.apply(e, now);
         }
         if (quit) break;
+        term::Size sz = tty.size();
+        for (const auto& me : mouseEvents) {
+            int mw = tty.mousePixels() ? sz.pixelW : sz.cols, mh = tty.mousePixels() ? sz.pixelH : sz.rows;
+            mouse.apply(me, now, mw, mh);
+        }
 
         if (g.state() != game::State::Playing && keys.pressed(term::Key::Enter)) g = game::Game(map, static_cast<uint32_t>(now * 1000));
-        g.update(readControls(keys), static_cast<float>(dt));
+        game::Controls controls = readControls(keys);
+        if (o.mouse) applyMouse(controls, mouse, now, o.mouseSens);
+        g.update(controls, static_cast<float>(dt));
 
         if (tty.consumeResize()) presenter.invalidate();
-        term::Size sz = tty.size();
         view.draw(g, sz.cols, sz.rows, o.cellW, sz.cellAspect());
         tty.write(presenter.frame(view.grid));
 

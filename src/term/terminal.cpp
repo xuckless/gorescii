@@ -23,6 +23,8 @@ constexpr std::string_view kEnterSeq =
     "\x1b[?7l"     // no autowrap
     "\x1b[2J";
 constexpr std::string_view kLeaveSeq =
+    "\x1b[?1016l\x1b[?1006l\x1b[?1003l\x1b[?1004l"  // mouse and focus reporting off
+    "\x1b]22;default\x1b\\"  // pointer shape back to normal
     "\x1b[<u"      // pop kitty keyboard flags (ignored if unsupported)
     "\x1b[0m"
     "\x1b[?7h"
@@ -67,7 +69,7 @@ double Size::cellAspect() const {
 
 Terminal::~Terminal() { leave(); }
 
-bool Terminal::enter() {
+bool Terminal::enter(bool mouse) {
     if (active_) return true;
     if (!isatty(STDIN_FILENO) || !isatty(STDOUT_FILENO)) return false;
     if (tcgetattr(STDIN_FILENO, &g_saved) != 0) return false;
@@ -89,14 +91,20 @@ bool Terminal::enter() {
     std::signal(SIGWINCH, onResize);
 
     writeAll(kEnterSeq);
-    kitty_ = probeKitty();
+    writeAll("\x1b[?1004h");  // focus in/out reports
+    if (mouse) {
+        // Any-motion tracking with SGR encoding, and a crosshair pointer (OSC 22).
+        writeAll("\x1b[?1003h\x1b[?1006h\x1b]22;crosshair\x1b\\");
+    }
+    probe(mouse);
     return true;
 }
 
-bool Terminal::probeKitty() {
-    // Ask for the current kitty flags, then primary device attributes. Every
-    // terminal answers DA; only kitty-protocol terminals answer CSI ? u first.
-    writeAll("\x1b[?u\x1b[c");
+void Terminal::probe(bool mouse) {
+    // Ask for the current kitty flags and whether SGR-pixel mouse mode exists
+    // (DECRQM), then primary device attributes. Every terminal answers DA, so
+    // anything that has not answered before it is unsupported.
+    writeAll(mouse ? "\x1b[?u\x1b[?1016$p\x1b[c" : "\x1b[?u\x1b[c");
     std::string reply;
     auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(300);
     bool sawKitty = false;
@@ -106,7 +114,7 @@ bool Terminal::probeKitty() {
         if (reply.find("\x1b[?") != std::string::npos) {
             size_t pos = 0;
             while ((pos = reply.find("\x1b[?", pos)) != std::string::npos) {
-                size_t end = reply.find_first_of("uc", pos + 3);
+                size_t end = reply.find_first_of("ucy", pos + 3);
                 if (end == std::string::npos) break;
                 if (reply[end] == 'u') sawKitty = true;
                 if (reply[end] == 'c') {
@@ -114,13 +122,20 @@ bool Terminal::probeKitty() {
                         // 1 disambiguate | 2 event types | 8 all keys as escapes
                         writeAll("\x1b[>11u");
                     }
-                    return sawKitty;
+                    // DECRPM: CSI ? 1016 ; Ps $ y with Ps 1 (set) or 2 (reset) = supported.
+                    bool pixels = reply.find("\x1b[?1016;1$y") != std::string::npos ||
+                                  reply.find("\x1b[?1016;2$y") != std::string::npos;
+                    if (pixels && size().pixelW > 0) {
+                        writeAll("\x1b[?1016h");
+                        mousePixels_ = true;
+                    }
+                    kitty_ = sawKitty;
+                    return;
                 }
                 pos = end + 1;
             }
         }
     }
-    return false;
 }
 
 void Terminal::leave() {
@@ -128,6 +143,7 @@ void Terminal::leave() {
     restoreTty();
     active_ = false;
     kitty_ = false;
+    mousePixels_ = false;
 }
 
 Size Terminal::size() const {

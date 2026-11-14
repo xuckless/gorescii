@@ -1,6 +1,7 @@
 #include "term/input.h"
 
 #include <cctype>
+#include <cstdio>
 
 namespace tg::term {
 namespace {
@@ -86,7 +87,7 @@ KeyAction actionFor(int event) {
 
 }  // namespace
 
-std::vector<KeyEvent> decode(std::string& buf) {
+std::vector<KeyEvent> decode(std::string& buf, std::vector<MouseEvent>* mouse) {
     std::vector<KeyEvent> out;
     size_t i = 0;
     while (i < buf.size()) {
@@ -118,7 +119,32 @@ std::vector<KeyEvent> decode(std::string& buf) {
             std::string params = buf.substr(i + 2, j - (i + 2));
             char final = buf[j];
             i = j + 1;
-            if (!params.empty() && (params[0] == '?' || params[0] == '>')) continue;  // replies
+            if (!params.empty() && params[0] == '<' && (final == 'M' || final == 'm')) {
+                int b = -1, mx = 0, my = 0;
+                if (std::sscanf(params.c_str() + 1, "%d;%d;%d", &b, &mx, &my) == 3 && mouse) {
+                    MouseEvent me;
+                    me.x = mx;
+                    me.y = my;
+                    if (b & 64) {
+                        me.wheel = (b & 1) ? -1 : 1;
+                    } else {
+                        int btn = b & 3;
+                        me.motion = (b & 32) != 0;
+                        me.button = btn == 3 ? -1 : btn;
+                        if (!me.motion) {
+                            me.press = final == 'M';
+                            me.release = final == 'm';
+                        }
+                    }
+                    mouse->push_back(me);
+                }
+                continue;
+            }
+            if (!params.empty() && (params[0] == '?' || params[0] == '>' || params[0] == '<')) continue;  // replies
+            if (params.empty() && (final == 'I' || final == 'O')) {
+                out.push_back({final == 'I' ? Key::FocusIn : Key::FocusOut});
+                continue;
+            }
             CsiParams p = parseParams(params);
             KeyEvent e;
             if (final == 'u') {
@@ -179,6 +205,46 @@ void KeyState::apply(const KeyEvent& e, double now) {
             s.repeating = false;
             break;
     }
+}
+
+void KeyState::releaseAll() {
+    for (auto& s : slots_) s = Slot{};
+}
+
+void MouseState::beginFrame() {
+    dx_ = 0;
+    wheel_ = 0;
+    rightPressed_ = false;
+}
+
+void MouseState::apply(const MouseEvent& e, double now, int width, int height) {
+    last_ = now;
+    if (e.wheel) {
+        wheel_ += e.wheel;
+        return;
+    }
+    float nx = width > 1 ? static_cast<float>(e.x - 1) / static_cast<float>(width - 1) : 0.5f;
+    float ny = height > 1 ? static_cast<float>(e.y - 1) / static_cast<float>(height - 1) : 0.5f;
+    if (hasPos_) dx_ += nx - x_;
+    x_ = nx;
+    y_ = ny;
+    hasPos_ = true;
+    if (e.press || e.release) {
+        bool down = e.press;
+        if (e.button == 0) left_ = down;
+        if (e.button == 2) {
+            if (down && !right_) rightPressed_ = true;
+            right_ = down;
+        }
+    } else if (e.motion && e.button < 0) {
+        // Motion with no buttons: any release we missed has happened.
+        left_ = right_ = false;
+    }
+}
+
+void MouseState::releaseAll() {
+    left_ = right_ = false;
+    hasPos_ = false;
 }
 
 }  // namespace tg::term
