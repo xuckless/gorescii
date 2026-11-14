@@ -61,3 +61,23 @@ TEST(outpost_map_loads) {
     }
     for (bool b : seen) CHECK(b);
 }
+
+#include "world/trace.h"
+
+TEST(trace_through_portals_and_steps) {
+    MapError err;
+    auto m = parseMap(
+        "sector floor=0 ceil=3 : 0,0 4,0 4,4 0,4\n"
+        "sector floor=0 ceil=3 : 4,0 8,0 8,4 4,4\n"
+        "sector floor=2.5 ceil=3 : 8,0 10,0 10,4 8,4\n"  // tall step
+        "thing player 1,1\n",
+        err);
+    CHECK(m.has_value());
+    if (!m) return;
+    CHECK(lineOfSight(*m, 0, {1, 2}, 1.6f, {7, 2}, 1.6f));           // through one portal
+    CHECK(!lineOfSight(*m, 0, {1, 2}, 1.6f, {12, 2}, 1.6f));         // out through a wall
+    CHECK(!lineOfSight(*m, 0, {1, 2}, 1.0f, {9, 2}, 2.7f));          // hits the step face
+    CHECK(lineOfSight(*m, 0, {1, 2}, 2.8f, {9, 2}, 2.8f));           // over the step
+    float t = traceSegment(*m, 0, {1, 2}, 1.6f, {21, 2}, 1.6f);       // wall at x=8 (step)
+    CHECK(t > 0.34f && t < 0.36f);
+}

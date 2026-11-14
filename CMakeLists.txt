@@ -19,6 +19,7 @@ add_library(textgme_core STATIC
   src/gfx/ascii.cpp
   src/gfx/present.cpp
   src/world/map.cpp
+  src/world/trace.cpp
   src/render/textures.cpp
   src/render/renderer.cpp
   src/render/sprites.cpp
