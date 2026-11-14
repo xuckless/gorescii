@@ -282,6 +282,27 @@ std::array<Image, static_cast<size_t>(SpriteId::Count)> makeAll() {
         "..oyffyo..",
         "...oyyo...",
     }));
+    // Keycards: a coloured card with a dark stripe and a light chip.
+    set(SpriteId::KeyRed, build({
+        "kkkkkkkk",
+        "kDDDDDDk",
+        "kDwwDDDk",
+        "kDwwDDDk",
+        "kkkkkkkk",
+        "kDDDDDDk",
+        "kDDDDDDk",
+        "kkkkkkkk",
+    }));
+    set(SpriteId::KeyBlue, build({
+        "kkkkkkkk",
+        "kBBBBBBk",
+        "kBwwBBBk",
+        "kBwwBBBk",
+        "kkkkkkkk",
+        "kBBBBBBk",
+        "kBBBBBBk",
+        "kkkkkkkk",
+    }));
     return a;
 }
 

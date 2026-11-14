@@ -25,7 +25,14 @@ const EnemyDef& def(ThingType t) {
 }
 
 bool isEnemy(ThingType t) { return t == ThingType::Grunt || t == ThingType::Brute; }
-bool isPickup(ThingType t) { return t == ThingType::Medkit || t == ThingType::Ammo || t == ThingType::Armor; }
+bool isPickup(ThingType t) {
+    return t == ThingType::Medkit || t == ThingType::Ammo || t == ThingType::Armor || t == ThingType::RedKey ||
+           t == ThingType::BlueKey;
+}
+
+constexpr float kDoorSpeed = 2.5f, kLiftSpeed = 2.0f;
+constexpr float kDoorWait = 4.0f, kLiftWait = 3.0f;
+constexpr float kUseReach = 1.6f;
 
 // Distance along a ray (origin o, unit dir d) to a circle, or -1.
 float rayCircle(Vec2 o, Vec2 d, Vec2 c, float r) {
@@ -88,11 +95,19 @@ void Game::update(const Controls& c, float dt) {
     if (state_ != State::Playing) {
         // Keep the world alive behind the death / win screen, but the player is out.
         for (Enemy& e : enemies_) updateEnemy(e, dt);
+        updateMovers(dt);
         updateProjectiles(dt);
         return;
     }
     elapsed_ += dt;
 
+    if (c.use) {
+        int target = moverAhead(player_.pos, player_.angle, player_.sector, kUseReach);
+        const Sector& here = map_.sectors[static_cast<size_t>(player_.sector)];
+        if (target < 0 && here.mover == Mover::Lift) target = player_.sector;
+        if (target >= 0) activate(target, true);
+    }
+    updateMovers(dt);
     stepPlayer(map_, player_, c, dt);
     updateWeapon(c, dt);
     for (Enemy& e : enemies_) updateEnemy(e, dt);
@@ -277,6 +292,10 @@ void Game::updateEnemy(Enemy& e, float dt) {
             // Stuck on geometry: pick a random direction for a moment.
             float moved = length(e.body.pos - before);
             e.stuck = moved < d.speed * dt * 0.3f ? e.stuck + dt : 0;
+            if (e.stuck > 0.2f) {
+                int door = moverAhead(e.body.pos, std::atan2(dir.y, dir.x), e.body.sector, e.body.radius + 1.0f);
+                if (door >= 0 && map_.sectors[static_cast<size_t>(door)].mover == Mover::Door) activate(door, false);
+            }
             if (e.stuck > 0.4f && e.wander <= 0) {
                 float a = rand01() * 2 * kPi;
                 e.wanderDir = {std::cos(a), std::sin(a)};
@@ -355,6 +374,14 @@ void Game::updatePickups() {
                 ammo_ = std::min(200, ammo_ + 20);
                 say("Picked up some ammo.");
                 break;
+            case ThingType::RedKey:
+                redKey_ = true;
+                say("Picked up the red key.");
+                break;
+            case ThingType::BlueKey:
+                blueKey_ = true;
+                say("Picked up the blue key.");
+                break;
             case ThingType::Armor:
                 if (armor_ >= 100) continue;
                 armor_ = std::min(100, armor_ + 50);
@@ -429,10 +456,17 @@ void Game::collectSprites(std::vector<render::SpriteInstance>& out) const {
         s.z = map_.sectors[static_cast<size_t>(p.sector)].floor;
         s.light = lightAt(p.sector);
         s.id = p.id;
-        s.image = &sprite(p.type == ThingType::Medkit ? SpriteId::Medkit
-                          : p.type == ThingType::Ammo ? SpriteId::Ammo
-                                                      : SpriteId::Armor);
-        s.height = p.type == ThingType::Armor ? 0.55f : 0.42f;
+        bool key = p.type == ThingType::RedKey || p.type == ThingType::BlueKey;
+        s.image = &sprite(p.type == ThingType::Medkit   ? SpriteId::Medkit
+                          : p.type == ThingType::Ammo   ? SpriteId::Ammo
+                          : p.type == ThingType::RedKey ? SpriteId::KeyRed
+                          : p.type == ThingType::BlueKey ? SpriteId::KeyBlue
+                                                         : SpriteId::Armor);
+        s.height = p.type == ThingType::Armor ? 0.55f : key ? 0.32f : 0.42f;
+        if (key) {
+            s.z += 0.25f + 0.08f * std::sin(elapsed_ * 3.0f);  // keys hover and bob
+            s.fullbright = true;
+        }
         out.push_back(s);
     }
     for (const Projectile& p : projectiles_) {
@@ -462,6 +496,93 @@ WeaponView Game::weaponView() const {
     v.flash = firing;
     if (state_ == State::Dead) v.bobY = 1.0f;  // lowered off-screen
     return v;
+}
+
+int Game::moverAhead(Vec2 pos, float angle, int sector, float reach) const {
+    // Walk along the facing direction and report the first door/lift sector.
+    Vec2 dir{std::cos(angle), std::sin(angle)};
+    int hint = sector;
+    for (float t = 0.1f; t <= reach; t += 0.1f) {
+        int s = map_.sectorAt(pos + dir * t, hint);
+        if (s < 0) return -1;
+        if (s != sector && map_.sectors[static_cast<size_t>(s)].mover != Mover::None) return s;
+        hint = s;
+    }
+    return -1;
+}
+
+bool Game::occupied(int sector) const {
+    const Sector& s = map_.sectors[static_cast<size_t>(sector)];
+    auto inside = [&](const Body& b) {
+        if (b.sector == sector) return true;
+        if (!s.contains(b.pos)) {
+            for (size_t e = 0; e < s.edgeCount(); ++e)
+                if (length(closestOnSegment(s.a(e), s.b(e), b.pos) - b.pos) < b.radius && side(s.a(e), s.b(e), b.pos) > -b.radius)
+                    return true;
+            return false;
+        }
+        return true;
+    };
+    if (inside(player_)) return true;
+    for (const Enemy& e : enemies_)
+        if (e.alive() && inside(e.body)) return true;
+    return false;
+}
+
+bool Game::activate(int sector, bool byPlayer) {
+    Sector& s = map_.sectors[static_cast<size_t>(sector)];
+    if (s.mover == Mover::None) return false;
+    if (s.mover == Mover::Door && !hasKey(s.key)) {
+        if (byPlayer) say(s.key == KeyColor::Red ? "You need the red key." : "You need the blue key.");
+        return false;
+    }
+    for (ActiveMover& m : movers_) {
+        if (m.sector != sector) continue;
+        // Already moving: a closing door reopens, a parked one waits longer.
+        if (s.mover == Mover::Door) {
+            if (m.dir < 0) m.dir = 1;
+            if (m.wait > 0) m.wait = kDoorWait;
+        }
+        return true;
+    }
+    movers_.push_back({sector, s.mover == Mover::Door ? 1 : -1, 0});
+    return true;
+}
+
+void Game::updateMovers(float dt) {
+    for (size_t i = 0; i < movers_.size();) {
+        ActiveMover& m = movers_[i];
+        Sector& s = map_.sectors[static_cast<size_t>(m.sector)];
+        bool done = false;
+        if (m.wait > 0) {
+            m.wait -= dt;
+            if (m.wait <= 0) m.dir = s.mover == Mover::Door ? -1 : 1;
+        } else if (s.mover == Mover::Door) {
+            if (m.dir > 0) {
+                s.ceil = std::min(s.openCeil, s.ceil + kDoorSpeed * dt);
+                if (s.ceil >= s.openCeil) m.wait = kDoorWait;
+            } else if (occupied(m.sector)) {
+                m.dir = 1;  // never crush: reopen
+            } else {
+                s.ceil = std::max(s.floor, s.ceil - kDoorSpeed * dt);
+                done = s.ceil <= s.floor;
+            }
+        } else {
+            if (m.dir < 0) {
+                s.floor = std::max(s.lowFloor, s.floor - kLiftSpeed * dt);
+                if (s.floor <= s.lowFloor) m.wait = kLiftWait;
+            } else {
+                s.floor = std::min(s.topFloor, s.floor + kLiftSpeed * dt);
+                done = s.floor >= s.topFloor;
+            }
+        }
+        if (done) {
+            movers_[i] = movers_.back();
+            movers_.pop_back();
+        } else {
+            ++i;
+        }
+    }
 }
 
 }  // namespace tg::game

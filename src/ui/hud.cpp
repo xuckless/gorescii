@@ -110,6 +110,8 @@ void drawHud(gfx::CellGrid& s, const game::Game& g, const HudInfo& info) {
     bool pistol = g.weapon() == game::Weapon::Pistol;
     x = put(s, x + 3, y, "1 PISTOL", pistol ? kYellow : kDim, &kBarBg);
     x = put(s, x + 2, y, "2 SCATTERGUN", pistol ? kDim : kYellow, &kBarBg);
+    if (g.hasKey(KeyColor::Red)) x = put(s, x + 2, y, "▮", kRed, &kBarBg);
+    if (g.hasKey(KeyColor::Blue)) x = put(s, x + (g.hasKey(KeyColor::Red) ? 1 : 2), y, "▮", kBlue, &kBarBg);
     std::snprintf(num, sizeof num, "KILLS %d/%d  %s", g.kills(), g.totalEnemies(), clock(g.elapsed()).c_str());
     int right = s.cols - width(num) - 1;
     if (right > x + 1) put(s, right, y, num, kLabel, &kBarBg);
@@ -126,7 +128,7 @@ void drawHud(gfx::CellGrid& s, const game::Game& g, const HudInfo& info) {
     for (const auto& m : g.messages()) put(s, 1, my++, m.text, kYellow);
     if (!info.toast.empty()) put(s, 1, my++, info.toast, kBlue);
     if (info.showHelp && g.state() == game::State::Playing) {
-        put(s, 1, my++, "WASD move  ←→ / mouse turn  Space / click fire  1 2 Q weapons  Esc pause", kDim);
+        put(s, 1, my++, "WASD move  ←→ / mouse turn  Space / click fire  E use  1 2 Q weapons  Esc pause", kDim);
     }
 
     if (g.state() == game::State::Dead) {

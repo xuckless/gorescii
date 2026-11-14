@@ -36,6 +36,7 @@ smaller fonts mean more detail.
 | W A S D | move / strafe (always run; hold Shift to walk) |
 | ← → or J L, mouse | turn; park the pointer at a window edge to keep turning |
 | Space, Ctrl, left click | fire |
+| E | open doors, call lifts |
 | 1 2, Q, Tab, wheel, right click | switch weapon |
 | Esc | pause (X quits from the pause screen) |
 | C / V / B | colour mode / edge style (clean, lines, off) / background fill |

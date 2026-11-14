@@ -49,6 +49,13 @@ struct Projectile {
     uint32_t id = 0;
 };
 
+// A door or lift that is currently moving or waiting.
+struct ActiveMover {
+    int sector = -1;
+    int dir = 0;      // +1 up (door opening / lift rising), -1 down
+    float wait = 0;   // > 0 while parked at the far end
+};
+
 struct Message {
     std::string text;
     float time = 0;
@@ -83,6 +90,7 @@ public:
     float pickupFlash() const { return pickupFlash_; }
     float muzzleFlash() const { return fireAnim_ > 0 ? 1.0f : 0.0f; }
     const std::deque<Message>& messages() const { return messages_; }
+    bool hasKey(KeyColor k) const { return k == KeyColor::Red ? redKey_ : k == KeyColor::Blue ? blueKey_ : true; }
 
     // Exposed for tests.
     std::vector<Enemy>& enemies() { return enemies_; }
@@ -102,6 +110,11 @@ private:
     void updateProjectiles(float dt);
     void updatePickups();
     void separateBodies();
+    // Starts a door or lift. `byPlayer` controls key checks and messages.
+    bool activate(int sector, bool byPlayer);
+    int moverAhead(Vec2 pos, float angle, int sector, float reach) const;
+    bool occupied(int sector) const;
+    void updateMovers(float dt);
     float eyeZ() const { return player_.z + Body::kEye; }
 
     Map map_;
@@ -109,6 +122,8 @@ private:
     std::vector<Enemy> enemies_;
     std::vector<Pickup> pickups_;
     std::vector<Projectile> projectiles_;
+    std::vector<ActiveMover> movers_;
+    bool redKey_ = false, blueKey_ = false;
     std::deque<Message> messages_;
     std::mt19937 rng_;
     uint32_t nextId_ = 1;
