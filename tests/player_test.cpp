@@ -35,7 +35,7 @@ TEST(player_walks_up_a_step_and_stops_at_a_ledge) {
     run(m, b, c, 3.0f);
     CHECK(b.sector == 1);
     CHECK(std::abs(b.z - 0.5f) < 1e-3f);
-    CHECK(b.pos.x < 6.0f - Body::kRadius + 0.01f);
+    CHECK(b.pos.x < 6.0f - Body{}.radius + 0.01f);
     CHECK(b.pos.x > 5.5f);
 }
 
@@ -46,7 +46,7 @@ TEST(player_stops_at_solid_wall_and_slides) {
     Controls c;
     c.forward = 1;
     run(m, b, c, 2.0f);
-    CHECK(b.pos.x >= Body::kRadius - 0.01f);
+    CHECK(b.pos.x >= Body{}.radius - 0.01f);
     CHECK(b.pos.y > 3.0f);  // slid north along the wall
     CHECK(b.sector == 0);
 }

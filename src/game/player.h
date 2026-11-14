@@ -14,11 +14,11 @@ struct Controls {
 };
 
 struct Body {
-    static constexpr float kRadius = 0.32f;
-    static constexpr float kHeight = 1.8f;
     static constexpr float kStep = 0.65f;
     static constexpr float kEye = 1.6f;
 
+    float radius = 0.32f;
+    float height = 1.8f;
     Vec2 pos;
     Vec2 vel;
     float z = 0;   // feet height
@@ -28,11 +28,14 @@ struct Body {
     bool onGround = true;
 };
 
-// True if a body standing at feet height `z` cannot cross into `dest`.
-bool blocks(const Sector& dest, float z);
+// True if a body of `height` standing at feet height `z` cannot cross into `dest`.
+bool blocks(const Sector& dest, float z, float height);
 
 // Moves `b` by `delta`, sliding along anything that blocks it.
 void moveAndSlide(const Map& map, Body& b, Vec2 delta);
+
+// Gravity, landing and ceiling clamp for one tick.
+void applyGravity(const Map& map, Body& b, float dt);
 
 // Applies controls, friction, gravity and collision for one tick.
 void stepPlayer(const Map& map, Body& b, const Controls& c, float dt);

@@ -27,15 +27,15 @@ void nearby(const Map& map, int start, std::vector<int>& out) {
 
 }  // namespace
 
-bool blocks(const Sector& dest, float z) {
+bool blocks(const Sector& dest, float z, float height) {
     if (dest.floor - z > Body::kStep) return true;
-    return dest.ceil - std::max(dest.floor, z) < Body::kHeight;
+    return dest.ceil - std::max(dest.floor, z) < height;
 }
 
 void moveAndSlide(const Map& map, Body& b, Vec2 delta) {
     // Sub-step so fast moves cannot tunnel through thin walls.
     float dist = length(delta);
-    int steps = std::max(1, static_cast<int>(std::ceil(dist / (Body::kRadius * 0.5f))));
+    int steps = std::max(1, static_cast<int>(std::ceil(dist / (b.radius * 0.5f))));
     Vec2 stepDelta = delta * (1.0f / steps);
     std::vector<int> near;
     for (int st = 0; st < steps; ++st) {
@@ -52,15 +52,15 @@ void moveAndSlide(const Map& map, Body& b, Vec2 delta) {
                     if (!solid) {
                         const Sector& other = map.sectors[static_cast<size_t>(s.neighbor[e])];
                         const Sector& dest = inside ? other : s;
-                        if (!blocks(dest, b.z)) continue;
+                        if (!blocks(dest, b.z, b.height)) continue;
                     }
                     Vec2 q = closestOnSegment(a, c, p);
                     Vec2 away = p - q;
                     float d = length(away);
-                    if (d >= Body::kRadius) continue;
+                    if (d >= b.radius) continue;
                     Vec2 n = d > 1e-5f ? away * (1.0f / d) : normalize(Vec2{a.y - c.y, c.x - a.x});
                     if (solid && !inside) n = n * -1.0f;  // never get pushed out of the level
-                    p += n * (Body::kRadius - d + 1e-4f);
+                    p += n * (b.radius - d + 1e-4f);
                 }
             }
         }
@@ -101,7 +101,10 @@ void stepPlayer(const Map& map, Body& b, const Controls& c, float dt) {
     b.vel += dl > rate ? diff * (rate / dl) : diff;
 
     moveAndSlide(map, b, b.vel * dt);
+    applyGravity(map, b, dt);
+}
 
+void applyGravity(const Map& map, Body& b, float dt) {
     const Sector& s = map.sectors[static_cast<size_t>(b.sector)];
     if (b.z > s.floor + 1e-3f) {
         b.vz -= kGravity * dt;
@@ -113,7 +116,7 @@ void stepPlayer(const Map& map, Body& b, const Controls& c, float dt) {
         b.vz = 0;
         b.onGround = true;
     }
-    if (b.z + Body::kHeight > s.ceil) b.z = std::max(s.floor, s.ceil - Body::kHeight);
+    if (b.z + b.height > s.ceil) b.z = std::max(s.floor, s.ceil - b.height);
 }
 
 }  // namespace tg::game
