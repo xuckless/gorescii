@@ -56,3 +56,17 @@ TEST(presenter_only_sends_changes) {
     CHECK(third.find("\x1b[2;6H") != std::string::npos);
     CHECK(third.find('@') != std::string::npos);
 }
+
+TEST(monochrome_tint) {
+    Framebuffer fb;
+    fb.resize(4, 8);
+    fb.clear({200, 40, 40});
+    CellGrid g;
+    g.resize(1, 1);
+    AsciiShader sh;
+    sh.settings.colorBlend = 0;
+    sh.settings.tint = {60, 255, 90};
+    sh.apply(fb, 4, 8, g);
+    Rgb c = g.at(0, 0).fg;
+    CHECK(c.g > c.r && c.g > c.b);
+}

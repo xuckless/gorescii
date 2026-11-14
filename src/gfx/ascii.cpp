@@ -179,11 +179,13 @@ void AsciiShader::apply(const Framebuffer& fb, int cellW, int cellH, CellGrid& g
             float r = rs * inv, g = gs * inv, b = bs * inv;
             float m = std::max({r, g, b, 1.0f});
             float scale = 1.0f + s.colorNormalize * (255.0f / m - 1.0f);
-            auto mix = [&](float v) {
+            // Monochrome keeps some floor brightness so dim glyphs stay legible.
+            float mono = 0.35f + 0.65f * l;
+            auto mix = [&](float v, uint8_t t) {
                 float colored = std::min(255.0f, v * scale);
-                return static_cast<uint8_t>(std::clamp(s.colorBlend * colored + (1 - s.colorBlend) * 255.0f * l, 0.0f, 255.0f));
+                return static_cast<uint8_t>(std::clamp(s.colorBlend * colored + (1 - s.colorBlend) * t * mono, 0.0f, 255.0f));
             };
-            cell.fg = {mix(r), mix(g), mix(b)};
+            cell.fg = {mix(r, s.tint.r), mix(g, s.tint.g), mix(b, s.tint.b)};
             cell.bg = {static_cast<uint8_t>(r * s.backgroundBlend), static_cast<uint8_t>(g * s.backgroundBlend),
                        static_cast<uint8_t>(b * s.backgroundBlend)};
         }

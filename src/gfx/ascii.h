@@ -31,8 +31,9 @@ struct AsciiSettings {
     // across a 4x8 cell covers 4 or 8 pixels depending on its direction).
     float edgeCoverage = 0.3f;
 
-    // Colour: 0 = flat white glyphs, 1 = full image colour.
+    // Colour: 0 = monochrome glyphs in `tint`, 1 = full image colour.
     float colorBlend = 1.0f;
+    Rgb tint{255, 255, 255};
     // Pushes colours towards full brightness so dark cells aren't darkened twice.
     float colorNormalize = 0.6f;
     // Background as a fraction of the cell colour (0 = black terminal background).
