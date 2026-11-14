@@ -9,6 +9,7 @@
 #include <vector>
 #include <unistd.h>
 
+#include "audio/player.h"
 #include "game/game.h"
 #include "gfx/ascii.h"
 #include "gfx/present.h"
@@ -28,6 +29,7 @@ struct Options {
     std::string campaignPath = std::string(TEXTGME_ASSET_DIR) + "/maps/campaign.txt";
     int cellW = 4;
     bool mouse = true;
+    bool sound = true;
     gfx::EdgeStyle style = gfx::EdgeStyle::Clean;
     float mouseSens = 1.0f;
     bool snapshot = false;
@@ -39,6 +41,7 @@ struct Options {
 void usage() {
     std::puts(
         "usage: textgme [--map FILE] [--cell-width N] [--mouse-sens X] [--no-mouse]\n"
+        "               [--no-sound]\n"
         "               [--style clean|lines|off]\n"
         "               [--snapshot COLSxROWS] [--at X,Y,DEG]\n"
         "  --map       play one map instead of the campaign\n"
@@ -65,6 +68,8 @@ bool parseArgs(int argc, char** argv, Options& o) {
             else if (sv == "clean") o.style = gfx::EdgeStyle::Clean;
             else if (sv == "off") o.style = gfx::EdgeStyle::Off;
             else return false;
+        } else if (a == "--no-sound") {
+            o.sound = false;
         } else if (a == "--no-mouse") {
             o.mouse = false;
         } else if (a == "--mouse-sens") {
@@ -268,6 +273,10 @@ int runInteractive(const std::vector<Map>& levels, const Options& o) {
     };
     if (!tty.hasKeyReleaseEvents())
         toast("Tip: this terminal has no key-release events; movement follows key repeat. Try Ghostty/kitty/WezTerm.", 0, 8);
+    audio::Player sfx;
+    bool muted = false;
+    if (o.sound && !sfx.init())
+        toast("No audio player found (afplay, paplay or aplay); playing silently.", 0, 5);
 
     using clock = std::chrono::steady_clock;
     const auto t0 = clock::now();
@@ -293,6 +302,10 @@ int runInteractive(const std::vector<Map>& levels, const Options& o) {
                 if (e.key == term::keyChar('c')) toast(view.cycleColor(), now);
                 if (e.key == term::keyChar('v')) toast(view.cycleEdges(), now);
                 if (e.key == term::keyChar('b')) toast(view.toggleBackground(), now);
+                if (e.key == term::keyChar('m') && sfx.available()) {
+                    muted = !muted;
+                    toast(muted ? "Sound off" : "Sound on", now);
+                }
             }
             if (e.key == term::Key::FocusOut) {
                 keys.releaseAll();
@@ -324,6 +337,13 @@ int runInteractive(const std::vector<Map>& levels, const Options& o) {
             if (o.mouse) applyMouse(controls, mouse, now, o.mouseSens);
             g.update(controls, static_cast<float>(dt));
         }
+        for (const game::SoundEvent& se : g.takeSounds()) {
+            if (muted || !sfx.available()) continue;
+            float vol = 0.8f;
+            if (se.positional) vol *= std::clamp(1.0f - length(se.pos - g.player().pos) / 30.0f, 0.0f, 1.0f);
+            sfx.play(se.id, vol);
+        }
+        sfx.reap();
         if (now > toastUntil) hud.toast.clear();
         hud.paused = paused;
         hud.level = static_cast<int>(level) + 1;

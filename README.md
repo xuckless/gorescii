@@ -16,6 +16,9 @@ cmake --build build -j
 ctest --test-dir build      # unit tests
 ```
 
+Sound effects are synthesised at startup and played through `afplay`
+(macOS) or `paplay`/`aplay` (Linux) when one is installed.
+
 Use a truecolor terminal. Ghostty, kitty, WezTerm, foot and recent iTerm2
 also report key releases (kitty keyboard protocol), which makes movement
 feel right; elsewhere the game falls back to key repeat. Bigger windows and
@@ -26,6 +29,7 @@ smaller fonts mean more detail.
 | `--map FILE` | play one map instead of the campaign (`assets/maps/campaign.txt`; format in `assets/maps/README.md`) |
 | `--cell-width N` | pixels rendered per cell column (default 4; lower is faster) |
 | `--mouse-sens X` / `--no-mouse` | mouse look sensitivity, or turn it off |
+| `--no-sound` | no sound effects |
 | `--style clean\|lines\|off` | edge look: geometry only (default), texture detail in line glyphs too, or none |
 | `--snapshot 120x40 [--at X,Y,DEG]` | print one frame as plain text and exit |
 
@@ -40,6 +44,7 @@ smaller fonts mean more detail.
 | 1 2, Q, Tab, wheel, right click | switch weapon |
 | Esc | pause (X quits from the pause screen) |
 | C / V / B | colour mode / edge style (clean, lines, off) / background fill |
+| M | mute / unmute |
 | Enter | restart after dying or finishing |
 | Ctrl-C | quit |
 

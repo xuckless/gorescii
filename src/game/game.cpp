@@ -129,6 +129,7 @@ void Game::update(const Controls& c, float dt) {
     if (s.exit && state_ == State::Playing) {
         state_ = State::Won;
         say(map_.name.empty() ? std::string("Level cleared.") : map_.name + " cleared.");
+        sound(Sfx::Win);
     }
 
     float target = player_.z + Body::kEye;
@@ -150,6 +151,9 @@ void Game::damagePlayer(int amount) {
         health_ = 0;
         state_ = State::Dead;
         say("You died.");
+        sound(Sfx::PlayerDeath);
+    } else {
+        sound(Sfx::PlayerHurt);
     }
 }
 
@@ -163,12 +167,16 @@ void Game::updateWeapon(const Controls& c, float dt) {
     if (!c.fire || fireCooldown_ > 0) return;
     int cost = weapon_ == Weapon::Pistol ? 1 : 2;
     if (ammo_ < cost) {
-        if (noAmmoMsg_ <= 0) say("Out of ammo.");
+        if (noAmmoMsg_ <= 0) {
+            say("Out of ammo.");
+            sound(Sfx::Click);
+        }
         noAmmoMsg_ = 1.5f;
         return;
     }
     ammo_ -= cost;
     fireAnim_ = 0.12f;
+    sound(weapon_ == Weapon::Pistol ? Sfx::Pistol : Sfx::Scattergun);
     if (weapon_ == Weapon::Pistol) {
         fireCooldown_ = 0.38f;
         fireHitscan(0.02f, 1, 10, 18);
@@ -205,10 +213,12 @@ void Game::damageEnemy(Enemy& e, int amount) {
     e.health -= amount;
     e.flash = 0.12f;
     if (e.health <= 0) {
+        if (e.ai != Enemy::AI::Dead) sound(Sfx::EnemyDeath, e.body.pos);
         e.ai = Enemy::AI::Dead;
         ++kills_;
         return;
     }
+    if (e.flash <= 0.0f || e.ai != Enemy::AI::Pain) sound(Sfx::Pain, e.body.pos);
     if (rand01() < (e.type == ThingType::Brute ? 0.25f : 0.6f)) {
         e.ai = Enemy::AI::Pain;
         e.timer = 0.25f;
@@ -315,11 +325,13 @@ void Game::enemyAttack(Enemy& e) {
     Vec2 toPlayer = player_.pos - e.body.pos;
     float dist = length(toPlayer);
     if (e.type == ThingType::Grunt) {
+        sound(Sfx::EnemyShot, e.body.pos);
         float hitChance = std::clamp(0.85f - dist * 0.03f - length(player_.vel) * 0.03f, 0.2f, 0.85f);
         if (rand01() < hitChance) damagePlayer(randRange(3, 9));
         return;
     }
     if (dist < e.body.radius + player_.radius + 0.9f) {
+        sound(Sfx::Claw, e.body.pos);
         damagePlayer(randRange(10, 18));  // claws
         return;
     }
@@ -331,7 +343,10 @@ void Game::enemyAttack(Enemy& e) {
     p.sector = map_.sectorAt(p.pos, e.body.sector);
     p.damage = randRange(12, 20);
     p.id = nextId_++;
-    if (p.sector >= 0) projectiles_.push_back(p);
+    if (p.sector >= 0) {
+        projectiles_.push_back(p);
+        sound(Sfx::Fireball, e.body.pos);
+    }
 }
 
 void Game::updateProjectiles(float dt) {
@@ -393,6 +408,7 @@ void Game::updatePickups() {
         }
         p.taken = true;
         pickupFlash_ = 0.4f;
+        sound(Sfx::Pickup);
     }
 }
 
@@ -548,6 +564,9 @@ bool Game::activate(int sector, bool byPlayer) {
         return true;
     }
     movers_.push_back({sector, s.mover == Mover::Door ? 1 : -1, 0});
+    Vec2 centre{};
+    for (Vec2 v : s.verts) centre += v;
+    sound(s.mover == Mover::Door ? Sfx::Door : Sfx::Lift, centre * (1.0f / static_cast<float>(s.verts.size())));
     return true;
 }
 

@@ -4,9 +4,11 @@
 #include <deque>
 #include <random>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "game/player.h"
+#include "game/sound.h"
 #include "render/renderer.h"
 #include "world/map.h"
 
@@ -97,6 +99,8 @@ public:
     float pickupFlash() const { return pickupFlash_; }
     float muzzleFlash() const { return fireAnim_ > 0 ? 1.0f : 0.0f; }
     const std::deque<Message>& messages() const { return messages_; }
+    // Sounds triggered since the last call.
+    std::vector<SoundEvent> takeSounds() { return std::exchange(sounds_, {}); }
     bool hasKey(KeyColor k) const { return k == KeyColor::Red ? redKey_ : k == KeyColor::Blue ? blueKey_ : true; }
 
     // Exposed for tests.
@@ -107,6 +111,8 @@ private:
     float rand01();
     int randRange(int lo, int hi);
     void say(std::string text);
+    void sound(Sfx id) { sounds_.push_back({id, player_.pos, false}); }
+    void sound(Sfx id, Vec2 at) { sounds_.push_back({id, at, true}); }
 
     void updateWeapon(const Controls& c, float dt);
     void fireHitscan(float spreadRad, int pellets, int dmgLo, int dmgHi);
@@ -132,6 +138,7 @@ private:
     std::vector<ActiveMover> movers_;
     bool redKey_ = false, blueKey_ = false;
     std::deque<Message> messages_;
+    std::vector<SoundEvent> sounds_;
     std::mt19937 rng_;
     uint32_t nextId_ = 1;
 

@@ -251,3 +251,18 @@ TEST(pumping_station_is_beatable) {
     CHECK(won);
     CHECK(g.hasKey(KeyColor::Red) && g.hasKey(KeyColor::Blue));
 }
+
+TEST(firing_and_pickups_emit_sounds) {
+    Game g(arena("thing ammo 2.2,3\n"));
+    Controls c;
+    c.fire = true;
+    g.update(c, 1.0f / 60);
+    auto sounds = g.takeSounds();
+    bool shot = false, pickup = false;
+    for (auto& s : sounds) {
+        shot |= s.id == Sfx::Pistol;
+        pickup |= s.id == Sfx::Pickup;
+    }
+    CHECK(shot && pickup);
+    CHECK(g.takeSounds().empty());
+}
