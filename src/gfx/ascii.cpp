@@ -19,28 +19,33 @@ void gaussianKernel(float sigma, std::vector<float>& k) {
     for (float& v : k) v /= sum;
 }
 
-// Separable blur with clamped edges.
+// Separable blur with clamped edges; the interior skips the clamping.
 void blur(const std::vector<float>& src, std::vector<float>& dst, std::vector<float>& tmp, int w, int h,
           const std::vector<float>& k) {
-    int r = static_cast<int>(k.size() / 2);
+    const int r = static_cast<int>(k.size() / 2);
+    const float* kc = k.data() + r;
     tmp.resize(src.size());
     dst.resize(src.size());
     for (int y = 0; y < h; ++y) {
         const float* row = &src[static_cast<size_t>(y) * w];
         float* out = &tmp[static_cast<size_t>(y) * w];
         for (int x = 0; x < w; ++x) {
-            float s = 0;
-            for (int i = -r; i <= r; ++i) s += row[std::clamp(x + i, 0, w - 1)] * k[static_cast<size_t>(i + r)];
-            out[x] = s;
+            float acc = 0;
+            if (x >= r && x < w - r) {
+                for (int i = -r; i <= r; ++i) acc += row[x + i] * kc[i];
+            } else {
+                for (int i = -r; i <= r; ++i) acc += row[std::clamp(x + i, 0, w - 1)] * kc[i];
+            }
+            out[x] = acc;
         }
     }
+    std::fill(dst.begin(), dst.end(), 0.0f);
     for (int y = 0; y < h; ++y) {
         float* out = &dst[static_cast<size_t>(y) * w];
-        for (int x = 0; x < w; ++x) {
-            float s = 0;
-            for (int i = -r; i <= r; ++i)
-                s += tmp[static_cast<size_t>(std::clamp(y + i, 0, h - 1)) * w + x] * k[static_cast<size_t>(i + r)];
-            out[x] = s;
+        for (int i = -r; i <= r; ++i) {
+            const float* in = &tmp[static_cast<size_t>(std::clamp(y + i, 0, h - 1)) * w];
+            const float kv = kc[i];
+            for (int x = 0; x < w; ++x) out[x] += in[x] * kv;  // row-wise: vectorises
         }
     }
 }
@@ -75,40 +80,53 @@ void AsciiShader::computeEdges(const Framebuffer& fb) {
     }
 
     dir_.assign(n, -1);
-    auto dogAt = [&](int x, int y) {
-        return dog_[static_cast<size_t>(std::clamp(y, 0, h - 1)) * w + std::clamp(x, 0, w - 1)];
+    if (s.depthEdges) {
+        logDepth_.resize(n);
+        for (size_t i = 0; i < n; ++i) logDepth_[i] = std::log(std::max(fb.depth[i], 1e-3f));
+    }
+    const bool useSurface = s.surfaceEdges && fb.surface.size() == n;
+    const float depthT = s.depthThreshold * 4;  // Sobel weights sum to 4
+    // 3x3 Sobel at index i of a row-major w-wide buffer (interior pixels only).
+    auto sobel = [w](const float* p, size_t i, float& gx, float& gy) {
+        const float a = p[i - w - 1], b = p[i - w], c = p[i - w + 1];
+        const float d = p[i - 1], f = p[i + 1];
+        const float g = p[i + w - 1], hh = p[i + w], k = p[i + w + 1];
+        gx = (c + 2 * f + k) - (a + 2 * d + g);
+        gy = (g + 2 * hh + k) - (a + 2 * b + c);
     };
-    auto depthAt = [&](int x, int y) {
-        float d = fb.depth[static_cast<size_t>(std::clamp(y, 0, h - 1)) * w + std::clamp(x, 0, w - 1)];
-        return std::log(std::max(d, 1e-3f));
-    };
-    for (int y = 0; y < h; ++y) {
-        for (int x = 0; x < w; ++x) {
-            float gx = 0, gy = 0, mag = 0;
-            // Sobel on the DoG map.
-            float a = dogAt(x - 1, y - 1), b = dogAt(x, y - 1), c = dogAt(x + 1, y - 1);
-            float d = dogAt(x - 1, y), f = dogAt(x + 1, y);
-            float g = dogAt(x - 1, y + 1), hh = dogAt(x, y + 1), i = dogAt(x + 1, y + 1);
-            gx = (c + 2 * f + i) - (a + 2 * d + g);
-            gy = (g + 2 * hh + i) - (a + 2 * b + c);
-            mag = gx * gx + gy * gy;
+    for (int y = 1; y < h - 1; ++y) {
+        for (int x = 1; x < w - 1; ++x) {
+            const size_t i = static_cast<size_t>(y) * w + x;
+            float gx, gy;
+            sobel(dog_.data(), i, gx, gy);
+            float mag = gx * gx + gy * gy;
             bool edge = mag > 0.5f;
 
             if (s.depthEdges) {
-                float da = depthAt(x - 1, y - 1), db = depthAt(x, y - 1), dc = depthAt(x + 1, y - 1);
-                float dd = depthAt(x - 1, y), df = depthAt(x + 1, y);
-                float dg = depthAt(x - 1, y + 1), dh = depthAt(x, y + 1), di = depthAt(x + 1, y + 1);
-                float zx = (dc + 2 * df + di) - (da + 2 * dd + dg);
-                float zy = (dg + 2 * dh + di) - (da + 2 * db + dc);
+                float zx, zy;
+                sobel(logDepth_.data(), i, zx, zy);
                 float zmag = zx * zx + zy * zy;
-                float t = s.depthThreshold * 4;  // Sobel weights sum to 4
-                if (zmag > t * t && zmag * 16 > mag) {
+                if (zmag > depthT * depthT && zmag * 16 > mag) {
                     gx = zx;
                     gy = zy;
                     edge = true;
                 }
             }
-            if (edge) dir_[static_cast<size_t>(y) * w + x] = static_cast<signed char>(directionBucket(gx, gy));
+            if (useSurface && !edge) {
+                const uint32_t* sf = fb.surface.data();
+                const uint32_t self = sf[i];
+                auto df = [&](size_t j) { return sf[j] != self ? 1.0f : 0.0f; };
+                // Sobel over "neighbour is a different surface"; opposite signs
+                // map to the same glyph, so the sign doesn't matter.
+                float sx = (df(i - w + 1) + 2 * df(i + 1) + df(i + w + 1)) - (df(i - w - 1) + 2 * df(i - 1) + df(i + w - 1));
+                float sy = (df(i + w - 1) + 2 * df(i + w) + df(i + w + 1)) - (df(i - w - 1) + 2 * df(i - w) + df(i - w + 1));
+                if (sx != 0 || sy != 0) {
+                    gx = sx;
+                    gy = sy;
+                    edge = true;
+                }
+            }
+            if (edge) dir_[i] = static_cast<signed char>(directionBucket(gx, gy));
         }
     }
 }
@@ -124,7 +142,7 @@ void AsciiShader::apply(const Framebuffer& fb, int cellW, int cellH, CellGrid& g
 
     const int rampLen = static_cast<int>(s.ramp.size());
     const int perCell = cellW * cellH;
-    const int need = std::max(1, static_cast<int>(std::ceil(s.edgeCoverage * perCell)));
+    const int need = std::max(1, static_cast<int>(std::ceil(s.edgeCoverage * (cellW + cellH))));
 
     for (int cy = 0; cy < grid.rows; ++cy) {
         for (int cx = 0; cx < grid.cols; ++cx) {

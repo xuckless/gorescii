@@ -23,10 +23,13 @@ struct AsciiSettings {
     float dogSigma = 1.0f;      // inner Gaussian
     float dogK = 1.6f;          // outer sigma = sigma * k
     float dogTau = 1.0f;        // weight of the outer blur
-    float dogThreshold = 0.004f;
+    float dogThreshold = 0.05f;
     bool depthEdges = true;
     float depthThreshold = 0.08f;  // relative depth jump that counts as an edge
-    float edgeCoverage = 0.15f;    // fraction of a cell's pixels that must agree
+    bool surfaceEdges = true;      // edges where Framebuffer::surface changes
+    // Edge pixels a cell needs, as a fraction of cellW + cellH (a straight line
+    // across a 4x8 cell covers 4 or 8 pixels depending on its direction).
+    float edgeCoverage = 0.3f;
 
     // Colour: 0 = flat white glyphs, 1 = full image colour.
     float colorBlend = 1.0f;
@@ -48,7 +51,7 @@ public:
 
 private:
     void computeEdges(const Framebuffer& fb);
-    std::vector<float> lum_, blurA_, blurB_, tmp_, dog_;
+    std::vector<float> lum_, blurA_, blurB_, tmp_, dog_, logDepth_;
     std::vector<signed char> dir_;  // per pixel bucket or -1
     std::vector<float> kernel_;
 };
