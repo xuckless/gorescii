@@ -85,6 +85,9 @@ bool parseArgs(int argc, char** argv, Options& o) {
             const char* v = next();
             if (!v || std::sscanf(v, "%f,%f,%f", &o.atX, &o.atY, &o.atAngle) != 3) return false;
             o.snapAt = true;
+        } else if (a == "--help" || a == "-h") {
+            usage();
+            std::exit(0);
         } else if (a == "--version") {
             std::printf("gorescii %s\n", version());
             std::exit(0);
