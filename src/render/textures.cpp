@@ -112,10 +112,37 @@ Texture make(Tex t) {
             tex.texels[static_cast<size_t>(v * n + u)] = c;
         }
     }
+    tex.buildMips();
     return tex;
 }
 
 }  // namespace
+
+void Texture::buildMips() {
+    mips[0] = texels;
+    for (int l = 1; l < kLevels; ++l) {
+        int s = size >> l, ps = s * 2;
+        const auto& prev = mips[l - 1];
+        mips[l].resize(static_cast<size_t>(s * s));
+        for (int y = 0; y < s; ++y)
+            for (int x = 0; x < s; ++x) {
+                int r = 0, g = 0, b = 0;
+                for (int dy = 0; dy < 2; ++dy)
+                    for (int dx = 0; dx < 2; ++dx) {
+                        Rgb c = prev[static_cast<size_t>((y * 2 + dy) * ps + x * 2 + dx)];
+                        r += c.r, g += c.g, b += c.b;
+                    }
+                mips[l][static_cast<size_t>(y * s + x)] = {static_cast<uint8_t>(r / 4), static_cast<uint8_t>(g / 4),
+                                                            static_cast<uint8_t>(b / 4)};
+            }
+    }
+}
+
+int mipLevel(float texelsPerPixel) {
+    if (texelsPerPixel <= 1.0f) return 0;
+    int l = static_cast<int>(std::log2(texelsPerPixel));
+    return std::clamp(l, 0, Texture::kLevels - 1);
+}
 
 const Texture& texture(Tex t) {
     static const std::array<Texture, static_cast<size_t>(Tex::Count)> all = [] {

@@ -98,8 +98,10 @@ void Renderer::drawFlat(int x, int yStart, int yEnd, const Sector& s, bool ceili
         if (dy <= 0) continue;
         float dist = height * focal_ / dy;
         Vec2 p = cam_.pos + ray * dist;
+        // Flats are seen at a grazing angle, so bias the level by the slope.
+        float tpp = kTexelsPerMetre * dist / focal_ * std::max(1.0f, dist / std::max(height, 0.1f) * 0.5f);
         gfx::Rgb c = tex.sample(static_cast<int>(std::floor(p.x * kTexelsPerMetre)),
-                                static_cast<int>(std::floor(-p.y * kTexelsPerMetre)));
+                                static_cast<int>(std::floor(-p.y * kTexelsPerMetre)), mipLevel(tpp));
         size_t i = static_cast<size_t>(y) * fb_->width + x;
         fb_->color[i] = lit(c, glow ? 1.0f : shadeFor(s.light, dist));
         fb_->depth[i] = dist;
@@ -163,6 +165,7 @@ void Renderer::drawSector(int sectorIndex, int x0, int x1, int depth) {
             float u = (uA + (uB - uA) * t) * dist;
             int tu = static_cast<int>(std::floor(u * kTexelsPerMetre));
             float k = shadeFor(s.light, dist) * contrast;
+            const int mip = mipLevel(kTexelsPerMetre * dist / focal_);
 
             auto proj = [&](float z) { return horizon_ - (z - camZ) * focal_ * inv; };
             float yc = proj(s.ceil), yf = proj(s.floor);
@@ -177,7 +180,7 @@ void Renderer::drawSector(int sectorIndex, int x0, int x1, int depth) {
                     float z = camZ + (horizon_ - (y + 0.5f)) * dist / focal_;
                     int tv = static_cast<int>(std::floor(-z * kTexelsPerMetre));
                     size_t i = static_cast<size_t>(y) * w + x;
-                    fb_->color[i] = lit(tex.sample(tu, tv), k);
+                    fb_->color[i] = lit(tex.sample(tu, tv, mip), k);
                     fb_->depth[i] = dist;
                     fb_->surface[i] = id;
                 }

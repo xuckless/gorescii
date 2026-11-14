@@ -70,3 +70,15 @@ TEST(monochrome_tint) {
     Rgb c = g.at(0, 0).fg;
     CHECK(c.g > c.r && c.g > c.b);
 }
+
+#include "render/textures.h"
+
+TEST(texture_mips_average_and_select) {
+    using namespace tg::render;
+    const Texture& t = texture(tg::Tex::Tile);
+    CHECK(t.mips[1].size() == 32u * 32u);
+    CHECK(t.mips[3].size() == 8u * 8u);
+    CHECK(mipLevel(0.5f) == 0);
+    CHECK(mipLevel(2.5f) == 1);
+    CHECK(mipLevel(100.0f) == Texture::kLevels - 1);
+}
