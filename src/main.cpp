@@ -25,7 +25,7 @@ struct Options {
     std::string mapPath = std::string(TEXTGME_ASSET_DIR) + "/maps/outpost.map";
     int cellW = 4;
     bool mouse = true;
-    gfx::EdgeStyle style = gfx::EdgeStyle::Lines;
+    gfx::EdgeStyle style = gfx::EdgeStyle::Clean;
     float mouseSens = 1.0f;
     bool snapshot = false;
     int snapCols = 120, snapRows = 40;
@@ -36,7 +36,7 @@ struct Options {
 void usage() {
     std::puts(
         "usage: textgme [--map FILE] [--cell-width N] [--mouse-sens X] [--no-mouse]\n"
-        "               [--style lines|clean|off]\n"
+        "               [--style clean|lines|off]\n"
         "               [--snapshot COLSxROWS] [--at X,Y,DEG]\n"
         "  --snapshot  render one frame as plain text to stdout and exit");
 }
@@ -128,16 +128,16 @@ struct View {
         st.tint = {255, 255, 255};
         return "Colour: full";
     }
-    gfx::EdgeStyle style = gfx::EdgeStyle::Lines;
+    gfx::EdgeStyle style = gfx::EdgeStyle::Clean;
     void setStyle(gfx::EdgeStyle st) {
         style = st;
         gfx::applyEdgeStyle(shader.settings, st);
     }
-    // V cycles lines -> clean -> off.
+    // V cycles clean -> lines -> off.
     std::string cycleEdges() {
-        setStyle(style == gfx::EdgeStyle::Lines   ? gfx::EdgeStyle::Clean
-                 : style == gfx::EdgeStyle::Clean ? gfx::EdgeStyle::Off
-                                                  : gfx::EdgeStyle::Lines);
+        setStyle(style == gfx::EdgeStyle::Clean   ? gfx::EdgeStyle::Lines
+                 : style == gfx::EdgeStyle::Lines ? gfx::EdgeStyle::Off
+                                                  : gfx::EdgeStyle::Clean);
         return std::string("Edges: ") + gfx::edgeStyleName(style);
     }
     std::string toggleBackground() {
