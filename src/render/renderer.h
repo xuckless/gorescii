@@ -4,7 +4,10 @@
 // into a colour+depth framebuffer.
 #include <vector>
 
+#include <span>
+
 #include "gfx/framebuffer.h"
+#include "render/sprites.h"
 #include "world/map.h"
 
 namespace tg::render {
@@ -17,9 +20,26 @@ struct Camera {
     float fovDeg = 90;   // horizontal
 };
 
+// A billboard standing in the world.
+struct SpriteInstance {
+    const Image* image = nullptr;
+    Vec2 pos;
+    float z = 0;          // bottom
+    float height = 1.7f;  // world height; width follows the image aspect
+    float light = 1.0f;   // sector light where it stands
+    bool fullbright = false;
+    uint32_t id = 0;      // unique per object so the ASCII pass outlines it
+};
+
 class Renderer {
 public:
     void render(const Map& map, const Camera& cam, gfx::Framebuffer& fb);
+
+    // Draws sprites into the last rendered frame, depth-tested against it.
+    void drawSprites(std::span<const SpriteInstance> sprites, gfx::Framebuffer& fb);
+    // Draws a screen-space image (the held weapon) with no depth test.
+    // `pixel` is framebuffer pixels per image pixel.
+    void drawOverlay(const Image& img, float centerX, float bottomY, float pixel, float light, gfx::Framebuffer& fb);
 
     // Projection used for the last frame, for drawing sprites in the same space.
     float focal() const { return focal_; }

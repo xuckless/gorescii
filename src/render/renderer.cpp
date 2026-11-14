@@ -205,4 +205,56 @@ void Renderer::drawSector(int sectorIndex, int x0, int x1, int depth) {
     }
 }
 
+void Renderer::drawSprites(std::span<const SpriteInstance> sprites, gfx::Framebuffer& fb) {
+    const int w = fb.width, h = fb.height;
+    for (const SpriteInstance& sp : sprites) {
+        if (!sp.image || sp.image->w == 0) continue;
+        Vec2 rel = sp.pos - cam_->pos;
+        float d = dot(rel, fwd_);
+        if (d < 0.2f) continue;
+        const Image& img = *sp.image;
+        float scale = focal_ / d;
+        float worldW = sp.height * img.w / img.h;
+        float cx = w * 0.5f + dot(rel, right_) * scale;
+        float halfW = worldW * 0.5f * scale;
+        float top = horizon_ - (sp.z + sp.height - cam_->z) * scale;
+        float bottom = horizon_ - (sp.z - cam_->z) * scale;
+        int x0 = std::max(0, static_cast<int>(std::ceil(cx - halfW - 0.5f)));
+        int x1 = std::min(w, static_cast<int>(std::ceil(cx + halfW - 0.5f)));
+        int y0 = std::max(0, static_cast<int>(std::ceil(top - 0.5f)));
+        int y1 = std::min(h, static_cast<int>(std::ceil(bottom - 0.5f)));
+        float k = sp.fullbright ? 1.2f : shadeFor(sp.light, d);
+        for (int x = x0; x < x1; ++x) {
+            int tx = std::clamp(static_cast<int>((x + 0.5f - (cx - halfW)) / (2 * halfW) * img.w), 0, img.w - 1);
+            for (int y = y0; y < y1; ++y) {
+                size_t i = static_cast<size_t>(y) * w + x;
+                if (fb.depth[i] <= d) continue;
+                int ty = std::clamp(static_cast<int>((y + 0.5f - top) / (bottom - top) * img.h), 0, img.h - 1);
+                if (!img.solid(tx, ty)) continue;
+                fb.color[i] = lit(img.at(tx, ty), k);
+                fb.depth[i] = d;
+                fb.surface[i] = sp.id | 0x80000000u;
+            }
+        }
+    }
+}
+
+void Renderer::drawOverlay(const Image& img, float centerX, float bottomY, float pixel, float light,
+                           gfx::Framebuffer& fb) {
+    float left = centerX - img.w * pixel * 0.5f, top = bottomY - img.h * pixel;
+    int x0 = std::max(0, static_cast<int>(left)), x1 = std::min(fb.width, static_cast<int>(left + img.w * pixel));
+    int y0 = std::max(0, static_cast<int>(top)), y1 = std::min(fb.height, static_cast<int>(bottomY));
+    for (int y = y0; y < y1; ++y) {
+        int ty = std::clamp(static_cast<int>((y + 0.5f - top) / pixel), 0, img.h - 1);
+        for (int x = x0; x < x1; ++x) {
+            int tx = std::clamp(static_cast<int>((x + 0.5f - left) / pixel), 0, img.w - 1);
+            if (!img.solid(tx, ty)) continue;
+            size_t i = static_cast<size_t>(y) * fb.width + x;
+            fb.color[i] = lit(img.at(tx, ty), light);
+            fb.depth[i] = 0.3f;
+            fb.surface[i] = 0xfffffffeu;
+        }
+    }
+}
+
 }  // namespace tg::render

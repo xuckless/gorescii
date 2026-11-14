@@ -21,6 +21,7 @@ add_library(textgme_core STATIC
   src/world/map.cpp
   src/render/textures.cpp
   src/render/renderer.cpp
+  src/render/sprites.cpp
   src/game/player.cpp
   src/game/game.cpp
 )
