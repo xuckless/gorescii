@@ -12,6 +12,7 @@
 #include "gfx/present.h"
 #include "render/renderer.h"
 #include "term/input.h"
+#include "ui/hud.h"
 #include "term/terminal.h"
 #include "version.h"
 #include "world/map.h"
@@ -76,16 +77,18 @@ bool parseArgs(int argc, char** argv, Options& o) {
 
 struct View {
     gfx::Framebuffer fb;
-    gfx::CellGrid grid;
+    gfx::CellGrid scene, grid;
     gfx::AsciiShader shader;
     render::Renderer renderer;
 
     std::vector<render::SpriteInstance> sprites;
 
-    void draw(const game::Game& g, int cols, int rows, int cellW, double cellAspect) {
+    void draw(const game::Game& g, int cols, int rows, int cellW, double cellAspect, const ui::HudInfo& hud) {
         int cellH = std::max(1, static_cast<int>(std::lround(cellW * cellAspect)));
+        int sceneRows = std::max(1, rows - ui::kStatusRows);
         if (grid.cols != cols || grid.rows != rows) grid.resize(cols, rows);
-        if (fb.width != cols * cellW || fb.height != rows * cellH) fb.resize(cols * cellW, rows * cellH);
+        if (scene.cols != cols || scene.rows != sceneRows) scene.resize(cols, sceneRows);
+        if (fb.width != cols * cellW || fb.height != sceneRows * cellH) fb.resize(cols * cellW, sceneRows * cellH);
         renderer.render(g.map(), g.camera(), fb);
         g.collectSprites(sprites);
         renderer.drawSprites(sprites, fb);
@@ -93,7 +96,36 @@ struct View {
         float px = fb.height / 48.0f;
         renderer.drawOverlay(render::sprite(wv.sprite), fb.width * (0.5f + wv.bobX), fb.height * (1.0f + wv.bobY) + px,
                              px, wv.flash ? 1.3f : 0.9f, fb);
-        shader.apply(fb, cellW, cellH, grid);
+        ui::flashFrame(fb, g);
+        shader.apply(fb, cellW, cellH, scene);
+        std::copy(scene.cells.begin(), scene.cells.end(), grid.cells.begin());
+        ui::drawHud(grid, g, hud);
+    }
+
+    // C cycles colour / green phosphor / amber; V toggles edges; B background.
+    std::string cycleColor() {
+        auto& st = shader.settings;
+        if (st.colorBlend > 0.5f) {
+            st.colorBlend = 0;
+            st.tint = {80, 255, 120};
+            return "Colour: green phosphor";
+        }
+        if (st.tint.r < 200) {
+            st.tint = {255, 180, 60};
+            return "Colour: amber";
+        }
+        st.colorBlend = 1;
+        st.tint = {255, 255, 255};
+        return "Colour: full";
+    }
+    std::string toggleEdges() {
+        shader.settings.edges = !shader.settings.edges;
+        return shader.settings.edges ? "Edges on" : "Edges off";
+    }
+    std::string toggleBackground() {
+        auto& b = shader.settings.backgroundBlend;
+        b = b > 0 ? 0.0f : 0.3f;
+        return b > 0 ? "Background fill on" : "Background fill off";
     }
 };
 
@@ -146,7 +178,7 @@ int runSnapshot(const Map& map, const Options& o) {
         g = game::Game(moved);
     }
     View view;
-    view.draw(g, o.snapCols, o.snapRows, o.cellW, 2.0);
+    view.draw(g, o.snapCols, o.snapRows, o.cellW, 2.0, ui::HudInfo{});
     for (int y = 0; y < view.grid.rows; ++y) {
         std::string line;
         for (int x = 0; x < view.grid.cols; ++x) gfx::appendUtf8(line, view.grid.at(x, y).glyph);
@@ -168,6 +200,15 @@ int runInteractive(const Map& map, const Options& o) {
     View view;
     game::Game g(map);
     std::string inbuf;
+    bool paused = false;
+    ui::HudInfo hud;
+    double toastUntil = 0, helpUntil = 8.0;
+    auto toast = [&](std::string t, double now, double secs = 2.0) {
+        hud.toast = std::move(t);
+        toastUntil = now + secs;
+    };
+    if (!tty.hasKeyReleaseEvents())
+        toast("Tip: this terminal has no key-release events; movement follows key repeat. Try Ghostty/kitty/WezTerm.", 0, 8);
 
     using clock = std::chrono::steady_clock;
     const auto t0 = clock::now();
@@ -184,7 +225,16 @@ int runInteractive(const Map& map, const Options& o) {
         bool quit = false;
         mouseEvents.clear();
         for (const auto& e : term::decode(inbuf, &mouseEvents)) {
-            if (e.key == term::Key::Escape || (e.ctrl && e.key == term::keyChar('c'))) quit = true;
+            if (e.ctrl && e.key == term::keyChar('c')) quit = true;
+            if (e.action == term::KeyAction::Press && g.state() == game::State::Playing) {
+                if (e.key == term::Key::Escape) paused = !paused;
+                if (paused && e.key == term::keyChar('x')) quit = true;
+            }
+            if (e.action == term::KeyAction::Press && !e.ctrl) {
+                if (e.key == term::keyChar('c')) toast(view.cycleColor(), now);
+                if (e.key == term::keyChar('v')) toast(view.toggleEdges(), now);
+                if (e.key == term::keyChar('b')) toast(view.toggleBackground(), now);
+            }
             if (e.key == term::Key::FocusOut) {
                 keys.releaseAll();
                 mouse.releaseAll();
@@ -199,13 +249,21 @@ int runInteractive(const Map& map, const Options& o) {
             mouse.apply(me, now, mw, mh);
         }
 
-        if (g.state() != game::State::Playing && keys.pressed(term::Key::Enter)) g = game::Game(map, static_cast<uint32_t>(now * 1000));
-        game::Controls controls = readControls(keys);
-        if (o.mouse) applyMouse(controls, mouse, now, o.mouseSens);
-        g.update(controls, static_cast<float>(dt));
+        if (g.state() != game::State::Playing && keys.pressed(term::Key::Enter)) {
+            g = game::Game(map, static_cast<uint32_t>(now * 1000));
+            helpUntil = now + 4.0;
+        }
+        if (!paused) {
+            game::Controls controls = readControls(keys);
+            if (o.mouse) applyMouse(controls, mouse, now, o.mouseSens);
+            g.update(controls, static_cast<float>(dt));
+        }
+        if (now > toastUntil) hud.toast.clear();
+        hud.paused = paused;
+        hud.showHelp = now < helpUntil;
 
         if (tty.consumeResize()) presenter.invalidate();
-        view.draw(g, sz.cols, sz.rows, o.cellW, sz.cellAspect());
+        view.draw(g, sz.cols, sz.rows, o.cellW, sz.cellAspect(), hud);
         tty.write(presenter.frame(view.grid));
 
         double spent = std::chrono::duration<double>(clock::now() - t0).count() - now;

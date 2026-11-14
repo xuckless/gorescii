@@ -25,6 +25,7 @@ add_library(textgme_core STATIC
   src/render/sprites.cpp
   src/game/player.cpp
   src/game/game.cpp
+  src/ui/hud.cpp
 )
 target_include_directories(textgme_core PUBLIC src)
 target_compile_options(textgme_core PUBLIC -Wall -Wextra -Wpedantic -Wshadow)
